@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from rag_lab.config import Config, load_config
 
@@ -35,5 +36,5 @@ retriever:
 def test_load_config_rejects_unknown_chunker_type(tmp_path: Path) -> None:
     cfg_path = tmp_path / "rag.yml"
     cfg_path.write_text("chunker:\n  type: wat\n")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         load_config(cfg_path)

@@ -30,7 +30,8 @@ def test_embed_passes_model_name_to_client(monkeypatch: pytest.MonkeyPatch) -> N
         seen["model"] = model
         return fake.embed(model, input)
 
-    monkeypatch.setattr("rag_lab.embedders.ollama._client", lambda: type("C", (), {"embed": staticmethod(_embed)})())
+    client = type("C", (), {"embed": staticmethod(_embed)})()
+    monkeypatch.setattr("rag_lab.embedders.ollama._client", lambda: client)
     embedder = OllamaEmbedder(model="some-model", dimension=4)
     embedder.embed(["hi"])
     assert seen["model"] == "some-model"
