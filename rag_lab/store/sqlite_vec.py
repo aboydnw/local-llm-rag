@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import sqlite3
 import struct
 from pathlib import Path
@@ -11,6 +12,17 @@ from rag_lab.types import Chunk
 
 def _vec_to_blob(vector: list[float]) -> bytes:
     return struct.pack(f"{len(vector)}f", *vector)
+
+
+def _to_fts_query(query: str) -> str:
+    """Turn free-text into a safe FTS5 MATCH expression.
+
+    User questions contain punctuation (``?``, ``-``, quotes) that FTS5 parses as
+    query syntax. We extract bare word tokens, quote each as a phrase, and OR them
+    so any keyword match contributes.
+    """
+    tokens = re.findall(r"\w+", query)
+    return " OR ".join(f'"{token}"' for token in tokens)
 
 
 def _chunk_id(chunk: Chunk) -> str:
@@ -129,6 +141,9 @@ class SqliteVecStore:
             return int(n)
 
     def query_bm25(self, query: str, k: int) -> list[tuple[Chunk, float]]:
+        match = _to_fts_query(query)
+        if not match:
+            return []
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -138,7 +153,7 @@ class SqliteVecStore:
                 ORDER BY rank
                 LIMIT ?
                 """,
-                (query, k),
+                (match, k),
             ).fetchall()
             out: list[tuple[Chunk, float]] = []
             for chunk_id, rank in rows:

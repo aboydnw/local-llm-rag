@@ -7,12 +7,19 @@ from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.embedders.ollama import OllamaEmbedder
+from rag_lab.llms.ollama import OllamaLLM
 from rag_lab.loaders.markdown import MarkdownLoader
+from rag_lab.prompts import PromptBuilder
+from rag_lab.retrievers.bm25 import BM25Retriever
+from rag_lab.retrievers.hybrid import HybridRetriever
+from rag_lab.retrievers.vector import VectorRetriever
 from rag_lab.store.sqlite_vec import SqliteVecStore
 
 app = typer.Typer(no_args_is_help=True, help="rag-lab: local-first RAG framework")
 config_app = typer.Typer(no_args_is_help=True, help="Manage rag-lab config files.")
 app.add_typer(config_app, name="config")
+inspect_app = typer.Typer(no_args_is_help=True, help="Inspect what rag-lab indexed.")
+app.add_typer(inspect_app, name="inspect")
 
 DEFAULT_EMBEDDING_DIMENSIONS: dict[str, int] = {
     "nomic-embed-text": 768,
@@ -29,8 +36,8 @@ def version() -> None:
 
 @config_app.command("init")
 def config_init(
-    path: Path = typer.Option(Path("rag.yml"), "--path", help="Where to write the config."),
-    force: bool = typer.Option(False, "--force", help="Overwrite if file exists."),
+    path: Path = typer.Option(Path("rag.yml"), "--path"),
+    force: bool = typer.Option(False, "--force"),
 ) -> None:
     """Write a default rag.yml to the given path."""
     if path.exists() and not force:
@@ -43,8 +50,8 @@ def config_init(
 @app.command()
 def ingest(
     source: Path = typer.Argument(..., help="Directory of markdown files to ingest."),
-    config: Path = typer.Option(Path("rag.yml"), "--config", help="Path to rag.yml."),
-    db: Path = typer.Option(Path("rag.db"), "--db", help="Path to write the index."),
+    config: Path = typer.Option(Path("rag.yml"), "--config"),
+    db: Path = typer.Option(Path("rag.db"), "--db"),
 ) -> None:
     """Ingest markdown documents into a local sqlite-vec index."""
     if not source.exists() or not source.is_dir():
@@ -71,9 +78,92 @@ def ingest(
     embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
     store = SqliteVecStore(db, dimension=dimension)
 
-    typer.echo(f"Ingesting {source} into {db} (embedder: {cfg.embedder.model})...")
+    typer.echo(f"Ingesting {source} into {db}...")
     count = ingest_mod.run(loader=loader, chunker=chunker, embedder=embedder, store=store)
     typer.echo(f"Done. {count} chunks indexed.")
+
+
+@app.command()
+def ask(
+    question: str = typer.Argument(..., help="Your question."),
+    config: Path = typer.Option(Path("rag.yml"), "--config"),
+    db: Path = typer.Option(Path("rag.db"), "--db"),
+    k: int = typer.Option(None, "--k", help="Override retriever k from config."),
+    show_chunks: bool = typer.Option(
+        False, "--show-chunks", help="Print retrieved chunks before the answer."
+    ),
+) -> None:
+    """Ask a question against an ingested corpus."""
+    if not db.exists():
+        typer.echo(
+            f"Index file not found: {db}. Run `rag-lab ingest <source>` first.", err=True
+        )
+        raise typer.Exit(code=1)
+
+    cfg = config_mod.load_config(config)
+    dimension = DEFAULT_EMBEDDING_DIMENSIONS[cfg.embedder.model]
+    store = SqliteVecStore(db, dimension=dimension)
+    embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
+    retriever = HybridRetriever(
+        vector=VectorRetriever(store=store, embedder=embedder),
+        bm25=BM25Retriever(store=store),
+        vector_weight=cfg.retriever.vector_weight,
+        bm25_weight=cfg.retriever.bm25_weight,
+    )
+    llm = OllamaLLM(model=cfg.llm.model)
+    builder = PromptBuilder()
+
+    top_k = k or cfg.retriever.k
+    results = retriever.retrieve(question, k=top_k)
+    if show_chunks:
+        typer.echo("--- Retrieved chunks ---")
+        for i, r in enumerate(results, start=1):
+            typer.echo(
+                f"[{i}] {r.chunk.doc_path} — {' > '.join(r.chunk.heading_path)} "
+                f"(score {r.score:.3f})"
+            )
+            typer.echo(r.chunk.text[:200] + ("..." if len(r.chunk.text) > 200 else ""))
+            typer.echo("")
+
+    prompt = builder.build(question=question, results=results)
+    answer = llm.generate(prompt)
+
+    typer.echo(answer)
+    typer.echo("")
+    typer.echo("--- Sources ---")
+    for i, r in enumerate(results, start=1):
+        typer.echo(f"[{i}] {r.chunk.doc_path} — {' > '.join(r.chunk.heading_path)}")
+
+
+@inspect_app.command("chunks")
+def inspect_chunks(
+    doc: Path | None = typer.Option(None, "--doc", help="Filter to a single doc path."),
+    db: Path = typer.Option(Path("rag.db"), "--db"),
+    limit: int = typer.Option(20, "--limit"),
+) -> None:
+    """Dump chunks (optionally filtered to one doc) for debugging."""
+    import sqlite3
+
+    if not db.exists():
+        typer.echo(f"Index file not found: {db}.", err=True)
+        raise typer.Exit(code=1)
+    conn = sqlite3.connect(db)
+    if doc is not None:
+        rows = conn.execute(
+            "SELECT doc_path, position, heading_path, substr(text, 1, 200) "
+            "FROM chunks WHERE doc_path = ? ORDER BY position LIMIT ?",
+            (str(doc), limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT doc_path, position, heading_path, substr(text, 1, 200) "
+            "FROM chunks ORDER BY doc_path, position LIMIT ?",
+            (limit,),
+        ).fetchall()
+    for path, pos, heading, snippet in rows:
+        typer.echo(f"{path} [{pos}] {heading}")
+        typer.echo(f"  {snippet}")
+        typer.echo("")
 
 
 if __name__ == "__main__":

@@ -80,3 +80,25 @@ def test_query_bm25_ranks_higher_for_more_keyword_matches(tmp_path: Path) -> Non
     store.upsert(chunks, embedder.embed([c.text for c in chunks]))
     results = store.query_bm25("factory", k=2)
     assert results[0][0].text.startswith("factory class")
+
+
+def test_query_bm25_handles_natural_language_with_punctuation(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    chunks = [
+        Chunk(text="the alpha document explains setup", doc_path=Path("a.md"), heading_path=(), position=0),
+        Chunk(text="unrelated beta content", doc_path=Path("b.md"), heading_path=(), position=0),
+    ]
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    results = store.query_bm25("what is the alpha document about?", k=2)
+    assert results[0][0].text.startswith("the alpha document")
+
+
+def test_query_bm25_returns_empty_for_query_with_no_word_tokens(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    chunks = [Chunk(text="some content", doc_path=Path("a.md"), heading_path=(), position=0)]
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    assert store.query_bm25("?!...", k=2) == []
