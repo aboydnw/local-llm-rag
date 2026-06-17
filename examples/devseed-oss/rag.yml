@@ -1,0 +1,15 @@
+chunker:
+  type: markdown_aware
+  max_tokens: 512
+  overlap: 50
+embedder:
+  type: ollama
+  model: nomic-embed-text
+llm:
+  type: ollama
+  model: llama3.2:3b
+retriever:
+  type: hybrid
+  bm25_weight: 0.5
+  vector_weight: 0.5
+  k: 5

@@ -1,6 +1,6 @@
 import re
 import statistics
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from rag_lab.eval.runner import EvalResult
@@ -26,7 +26,7 @@ class MarkdownReporter:
         lines: list[str] = []
         lines.append("# rag-lab eval report")
         lines.append("")
-        lines.append(f"_Generated {datetime.now(timezone.utc).isoformat(timespec='seconds')}_")
+        lines.append(f"_Generated {datetime.now(UTC).isoformat(timespec='seconds')}_")
         lines.append("")
         lines.append(f"**Config:** {config_summary}")
         lines.append(f"**Questions evaluated:** {len(results)}")
