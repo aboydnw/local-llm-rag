@@ -25,12 +25,6 @@ app.add_typer(config_app, name="config")
 inspect_app = typer.Typer(no_args_is_help=True, help="Inspect what rag-lab indexed.")
 app.add_typer(inspect_app, name="inspect")
 
-DEFAULT_EMBEDDING_DIMENSIONS: dict[str, int] = {
-    "nomic-embed-text": 768,
-    "mxbai-embed-large": 1024,
-    "all-minilm": 384,
-}
-
 
 @app.command()
 def version() -> None:
@@ -73,14 +67,11 @@ def ingest(
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    dimension = DEFAULT_EMBEDDING_DIMENSIONS.get(cfg.embedder.model)
-    if dimension is None:
-        typer.echo(
-            f"Unknown embedding model '{cfg.embedder.model}'. "
-            f"Add it to DEFAULT_EMBEDDING_DIMENSIONS in cli.py.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    try:
+        dimension = config_mod.embedding_dimension(cfg.embedder.model)
+    except ValueError as exc:
+        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
+        raise typer.Exit(code=1) from exc
 
     loader: object
     workdir: tempfile.TemporaryDirectory | None = None
@@ -133,14 +124,11 @@ def ask(
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    dimension = DEFAULT_EMBEDDING_DIMENSIONS.get(cfg.embedder.model)
-    if dimension is None:
-        typer.echo(
-            f"Unknown embedding model '{cfg.embedder.model}'. "
-            f"Add it to DEFAULT_EMBEDDING_DIMENSIONS in cli.py.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    try:
+        dimension = config_mod.embedding_dimension(cfg.embedder.model)
+    except ValueError as exc:
+        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
+        raise typer.Exit(code=1) from exc
     store = SqliteVecStore(db, dimension=dimension)
     embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
     retriever = HybridRetriever(
@@ -237,14 +225,11 @@ def eval(  # noqa: A001
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    dimension = DEFAULT_EMBEDDING_DIMENSIONS.get(cfg.embedder.model)
-    if dimension is None:
-        typer.echo(
-            f"Unknown embedding model '{cfg.embedder.model}'. "
-            f"Add it to DEFAULT_EMBEDDING_DIMENSIONS in cli.py.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    try:
+        dimension = config_mod.embedding_dimension(cfg.embedder.model)
+    except ValueError as exc:
+        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
+        raise typer.Exit(code=1) from exc
 
     store = SqliteVecStore(db, dimension=dimension)
     embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
@@ -267,20 +252,33 @@ def eval(  # noqa: A001
     typer.echo(f"Running {len(items)} questions...")
     results = runner.run(items)
 
-    r = cfg.retriever
-    config_summary = (
-        f"chunker={cfg.chunker.type}@{cfg.chunker.max_tokens} "
-        f"retriever={r.type}(v={r.vector_weight},b={r.bm25_weight}) "
-        f"llm={cfg.llm.model} embedder={cfg.embedder.model}"
-    )
+    summary = config_mod.config_summary(cfg)
     report.parent.mkdir(parents=True, exist_ok=True)
     MarkdownReporter().write(
         results=results,
-        config_summary=config_summary,
+        config_summary=summary,
         out_path=report,
         previous_report=previous,
     )
     typer.echo(f"Report written to {report}")
+
+
+@app.command()
+def studio(
+    port: int = typer.Option(
+        8501, "--port", min=1, max=65535, help="Port for the Streamlit server."
+    ),
+) -> None:
+    """Launch the rag-lab studio web interface (requires the 'studio' extra)."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    app_path = Path(__file__).parent / "studio" / "app.py"
+    code = subprocess.call(
+        [sys.executable, "-m", "streamlit", "run", str(app_path), "--server.port", str(port)]
+    )
+    raise typer.Exit(code=code)
 
 
 if __name__ == "__main__":
