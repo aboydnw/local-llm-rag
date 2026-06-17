@@ -113,7 +113,7 @@ def ask(
     question: str = typer.Argument(..., help="Your question."),
     config: Path = typer.Option(Path("rag.yml"), "--config"),
     db: Path = typer.Option(Path("rag.db"), "--db"),
-    k: int = typer.Option(None, "--k", help="Override retriever k from config."),
+    k: int = typer.Option(None, "--k", min=1, help="Override retriever k from config."),
     show_chunks: bool = typer.Option(
         False, "--show-chunks", help="Print retrieved chunks before the answer."
     ),
@@ -124,9 +124,19 @@ def ask(
             f"Index file not found: {db}. Run `rag-lab ingest <source>` first.", err=True
         )
         raise typer.Exit(code=1)
+    if not config.exists():
+        typer.echo(f"Config file not found: {config}. Run `rag-lab config init`.", err=True)
+        raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    dimension = DEFAULT_EMBEDDING_DIMENSIONS[cfg.embedder.model]
+    dimension = DEFAULT_EMBEDDING_DIMENSIONS.get(cfg.embedder.model)
+    if dimension is None:
+        typer.echo(
+            f"Unknown embedding model '{cfg.embedder.model}'. "
+            f"Add it to DEFAULT_EMBEDDING_DIMENSIONS in cli.py.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     store = SqliteVecStore(db, dimension=dimension)
     embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
     retriever = HybridRetriever(
@@ -164,27 +174,28 @@ def ask(
 def inspect_chunks(
     doc: Path | None = typer.Option(None, "--doc", help="Filter to a single doc path."),
     db: Path = typer.Option(Path("rag.db"), "--db"),
-    limit: int = typer.Option(20, "--limit"),
+    limit: int = typer.Option(20, "--limit", min=1),
 ) -> None:
     """Dump chunks (optionally filtered to one doc) for debugging."""
     import sqlite3
+    from contextlib import closing
 
     if not db.exists():
         typer.echo(f"Index file not found: {db}.", err=True)
         raise typer.Exit(code=1)
-    conn = sqlite3.connect(db)
-    if doc is not None:
-        rows = conn.execute(
-            "SELECT doc_path, position, heading_path, substr(text, 1, 200) "
-            "FROM chunks WHERE doc_path = ? ORDER BY position LIMIT ?",
-            (str(doc), limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT doc_path, position, heading_path, substr(text, 1, 200) "
-            "FROM chunks ORDER BY doc_path, position LIMIT ?",
-            (limit,),
-        ).fetchall()
+    with closing(sqlite3.connect(db)) as conn:
+        if doc is not None:
+            rows = conn.execute(
+                "SELECT doc_path, position, heading_path, substr(text, 1, 200) "
+                "FROM chunks WHERE doc_path = ? ORDER BY position LIMIT ?",
+                (str(doc), limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT doc_path, position, heading_path, substr(text, 1, 200) "
+                "FROM chunks ORDER BY doc_path, position LIMIT ?",
+                (limit,),
+            ).fetchall()
     for path, pos, heading, snippet in rows:
         typer.echo(f"{path} [{pos}] {heading}")
         typer.echo(f"  {snippet}")

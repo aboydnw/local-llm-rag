@@ -6,21 +6,23 @@ from rag_lab.loaders.github import GitHubLoader
 
 
 def test_github_loader_clones_then_yields_markdown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    fake_clone_dir = tmp_path / "fake-repo"
-    fake_clone_dir.mkdir()
-    (fake_clone_dir / "README.md").write_text("# Fake\n\nHello.")
-    (fake_clone_dir / "sub").mkdir()
-    (fake_clone_dir / "sub" / "guide.md").write_text("# Guide\n\nFor humans.")
+    clone_dir = tmp_path / "repo"
+    clone_calls: list[str] = []
 
     def fake_clone(repo: str, dest: Path) -> None:
-        assert repo == "https://github.com/developmentseed/titiler.git"
+        clone_calls.append(repo)
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "README.md").write_text("# Fake\n\nHello.")
+        (dest / "sub").mkdir()
+        (dest / "sub" / "guide.md").write_text("# Guide\n\nFor humans.")
 
     loader = GitHubLoader(
         "developmentseed/titiler",
-        clone_into=fake_clone_dir,
+        clone_into=clone_dir,
         clone_fn=fake_clone,
     )
     paths = sorted(d.path.name for d in loader.load())
+    assert clone_calls == ["https://github.com/developmentseed/titiler.git"]
     assert paths == ["README.md", "guide.md"]
 
 

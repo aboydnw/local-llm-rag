@@ -14,6 +14,8 @@ class HybridRetriever:
         bm25_weight: float = 0.5,
         rrf_k: int = 60,
     ) -> None:
+        if rrf_k <= 0:
+            raise ValueError("rrf_k must be positive")
         self.vector = vector
         self.bm25 = bm25
         self.vector_weight = vector_weight
@@ -21,12 +23,14 @@ class HybridRetriever:
         self.rrf_k = rrf_k
 
     def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
+        if k <= 0:
+            raise ValueError("k must be positive")
         fetch_k = max(k * 3, 20)
         vector_hits = self.vector.retrieve(query, k=fetch_k)
         bm25_hits = self.bm25.retrieve(query, k=fetch_k)
 
-        scores: dict[str, float] = defaultdict(float)
-        chunk_by_id: dict[str, RetrievalResult] = {}
+        scores: dict[tuple[str, int], float] = defaultdict(float)
+        chunk_by_id: dict[tuple[str, int], RetrievalResult] = {}
 
         for rank, result in enumerate(vector_hits):
             cid = self._key(result)
@@ -46,5 +50,5 @@ class HybridRetriever:
         ]
 
     @staticmethod
-    def _key(result: RetrievalResult) -> str:
-        return f"{result.chunk.doc_path}|{result.chunk.position}"
+    def _key(result: RetrievalResult) -> tuple[str, int]:
+        return (str(result.chunk.doc_path), result.chunk.position)

@@ -29,7 +29,7 @@ class GitHubLoader:
 
     def load(self) -> Iterator[Document]:
         if not self._cloned:
-            if self.clone_into.exists() and any(self.clone_into.iterdir()):
+            if self.clone_into.is_dir() and any(self.clone_into.iterdir()):
                 pass
             else:
                 self.clone_into.mkdir(parents=True, exist_ok=True)

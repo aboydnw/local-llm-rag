@@ -34,6 +34,21 @@ def test_hybrid_combines_both_retrievers() -> None:
     assert results[0].source == "hybrid"
 
 
+def test_hybrid_rejects_non_positive_k() -> None:
+    import pytest
+
+    hybrid = HybridRetriever(vector=_StubRetriever([]), bm25=_StubRetriever([]))
+    with pytest.raises(ValueError):
+        hybrid.retrieve("x", k=0)
+
+
+def test_hybrid_rejects_non_positive_rrf_k() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        HybridRetriever(vector=_StubRetriever([]), bm25=_StubRetriever([]), rrf_k=0)
+
+
 def test_hybrid_respects_weights() -> None:
     vec = _StubRetriever([RetrievalResult(chunk=_chunk("V"), score=0.9, source="vector")])
     bm = _StubRetriever([RetrievalResult(chunk=_chunk("B"), score=5.0, source="bm25")])
