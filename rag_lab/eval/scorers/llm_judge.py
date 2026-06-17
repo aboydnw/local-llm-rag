@@ -64,7 +64,10 @@ class LLMJudge:
                 }
             ],
         )
-        text = response.content[0].text
+        blocks = getattr(response, "content", None) or []
+        text = "".join(
+            getattr(b, "text", "") for b in blocks if getattr(b, "type", "text") == "text"
+        )
         score_match = _SCORE_RE.search(text)
         reason_match = _REASON_RE.search(text)
         return JudgeResult(

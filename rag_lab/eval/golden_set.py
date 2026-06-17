@@ -14,6 +14,8 @@ class GoldenItem(BaseModel):
 
 def load_golden_set(path: Path) -> list[GoldenItem]:
     raw = yaml.safe_load(path.read_text()) or []
+    if not isinstance(raw, list):
+        raise ValueError("golden set must be a YAML list of items")
     items = [GoldenItem(**entry) for entry in raw]
     seen: set[str] = set()
     for item in items:

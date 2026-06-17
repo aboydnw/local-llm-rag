@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from rag_lab.eval.golden_set import GoldenItem, load_golden_set
 
@@ -33,7 +34,14 @@ def test_load_golden_set_parses_yaml(tmp_path: Path) -> None:
 def test_load_rejects_missing_required_field(tmp_path: Path) -> None:
     path = tmp_path / "bad.yml"
     path.write_text("- id: only-id\n")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
+        load_golden_set(path)
+
+
+def test_load_rejects_non_list_root(tmp_path: Path) -> None:
+    path = tmp_path / "mapping.yml"
+    path.write_text("id: x\nquestion: q\n")
+    with pytest.raises(ValueError):
         load_golden_set(path)
 
 

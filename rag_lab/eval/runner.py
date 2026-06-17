@@ -34,6 +34,8 @@ class EvalRunner:
         prompt_builder: PromptBuilder | None = None,
         judge: Judge | None = None,
     ) -> None:
+        if k <= 0:
+            raise ValueError("k must be positive")
         self.retriever = retriever
         self.llm = llm
         self.k = k

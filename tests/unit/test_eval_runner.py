@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from rag_lab.eval.golden_set import GoldenItem
 from rag_lab.eval.runner import EvalRunner
 from rag_lab.retrievers.base import RetrievalResult
@@ -75,6 +77,11 @@ def test_runner_passes_judge_score_when_judge_provided() -> None:
     results = runner.run(items)
     assert results[0].judge_score == 4
     assert results[0].judge_reason == "good"
+
+
+def test_runner_rejects_non_positive_k() -> None:
+    with pytest.raises(ValueError):
+        EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=0)
 
 
 def test_runner_no_judge_leaves_judge_fields_none() -> None:

@@ -74,7 +74,7 @@ class MarkdownReporter:
             row = f"| {r.item_id} | {r.recall_at_k:.2f} | {r.mrr:.2f} | {r.keyword_coverage:.2f} |"
             if has_judge:
                 judge_val = str(r.judge_score) if r.judge_score is not None else "n/a"
-                reason = (r.judge_reason or "").replace("|", "/")
+                reason = re.sub(r"\s+", " ", (r.judge_reason or "").replace("|", "/")).strip()
                 row += f" {judge_val} | {reason} |"
             lines.append(row)
         lines.append("")

@@ -63,3 +63,24 @@ def test_report_includes_judge_column_when_judge_results_present(tmp_path: Path)
     content = out_path.read_text()
     assert "judge" in content.lower()
     assert "5" in content
+
+
+def test_report_sanitizes_newlines_in_judge_reason(tmp_path: Path) -> None:
+    result = EvalResult(
+        item_id="a",
+        question="q",
+        actual_answer="ans",
+        recall_at_k=1.0,
+        mrr=1.0,
+        keyword_coverage=1.0,
+        judge_score=3,
+        judge_reason="line one\nline two\r\nline three",
+    )
+    out_path = tmp_path / "report.md"
+    MarkdownReporter().write(results=[result], config_summary="x", out_path=out_path)
+    detail_rows = [
+        line for line in out_path.read_text().splitlines() if line.startswith("| a |")
+    ]
+    assert len(detail_rows) == 1
+    assert "\n" not in detail_rows[0]
+    assert "line one line two line three" in detail_rows[0]

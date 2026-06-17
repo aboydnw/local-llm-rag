@@ -2,6 +2,8 @@ from rag_lab.retrievers.base import RetrievalResult
 
 
 def recall_at_k(results: list[RetrievalResult], ideal_docs: list[str], k: int) -> float:
+    if k <= 0:
+        raise ValueError("k must be positive")
     if not ideal_docs:
         return 1.0
     ideal = set(ideal_docs)
