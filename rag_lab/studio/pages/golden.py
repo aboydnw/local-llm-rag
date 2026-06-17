@@ -36,19 +36,23 @@ def render() -> None:
     c1, c2 = st.columns(2)
     if c1.button("Save item", type="primary") and item_id.strip() and question.strip():
         normalized_id = item_id.strip()
-        item = GoldenItem(
-            id=normalized_id,
-            question=question.strip(),
-            ideal_docs=[s.strip() for s in ideal_docs.splitlines() if s.strip()],
-            must_mention=[s.strip() for s in must_mention.splitlines() if s.strip()],
-            ideal_answer=ideal_answer.strip(),
-        )
-        updated = golden_io.upsert_item(items, item)
-        if existing and existing.id != normalized_id:
-            updated = golden_io.delete_item(updated, existing.id)
-        golden_io.save_items(path, updated)
-        st.success(f"Saved {normalized_id} to {path}")
-        st.rerun()
+        original_id = existing.id if existing else None
+        if normalized_id != original_id and any(i.id == normalized_id for i in items):
+            st.error(f"Item id '{normalized_id}' already exists.")
+        else:
+            item = GoldenItem(
+                id=normalized_id,
+                question=question.strip(),
+                ideal_docs=[s.strip() for s in ideal_docs.splitlines() if s.strip()],
+                must_mention=[s.strip() for s in must_mention.splitlines() if s.strip()],
+                ideal_answer=ideal_answer.strip(),
+            )
+            updated = golden_io.upsert_item(items, item)
+            if original_id is not None and original_id != normalized_id:
+                updated = golden_io.delete_item(updated, original_id)
+            golden_io.save_items(path, updated)
+            st.success(f"Saved {normalized_id} to {path}")
+            st.rerun()
     if c2.button("Delete item") and existing:
         golden_io.save_items(path, golden_io.delete_item(items, existing.id))
         st.success(f"Deleted {existing.id}")
