@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(git stash *)",
+      "Bash(cp ~/projects/rag-lab/examples/devseed-oss/rag.yml ./rag.yml)",
+      "Bash(sed -i 's/llama3.2:3b/qwen2.5:3b/' rag.yml)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(git ls-tree *)",
+      "Bash(git tag *)",
+      "Bash(break)"
+    ]
+  }
+}
