@@ -25,9 +25,11 @@ def build_retriever(store: SqliteVecStore, embedder, config: Config) -> Retrieve
         return vector
     if rtype == "bm25":
         return bm25
-    return HybridRetriever(
-        vector=vector,
-        bm25=bm25,
-        vector_weight=config.retriever.vector_weight,
-        bm25_weight=config.retriever.bm25_weight,
-    )
+    if rtype == "hybrid":
+        return HybridRetriever(
+            vector=vector,
+            bm25=bm25,
+            vector_weight=config.retriever.vector_weight,
+            bm25_weight=config.retriever.bm25_weight,
+        )
+    raise ValueError(f"Unknown retriever type: {rtype}")

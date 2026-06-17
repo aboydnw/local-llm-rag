@@ -265,7 +265,9 @@ def eval(  # noqa: A001
 
 @app.command()
 def studio(
-    port: int = typer.Option(8501, "--port", help="Port for the Streamlit server."),
+    port: int = typer.Option(
+        8501, "--port", min=1, max=65535, help="Port for the Streamlit server."
+    ),
 ) -> None:
     """Launch the rag-lab studio web interface (requires the 'studio' extra)."""
     import subprocess

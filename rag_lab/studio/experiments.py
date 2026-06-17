@@ -71,6 +71,8 @@ def run_eval(
     scores = _aggregate_scores(results)
 
     run_dir = workspace.run_dir(run_id)
+    if (run_dir / "run.json").exists():
+        raise ValueError(f"run already exists: {run_id}")
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "config.yml").write_text(yaml.safe_dump(config.model_dump()))
     MarkdownReporter().write(
@@ -159,7 +161,10 @@ def _flatten(config: Config) -> dict[str, object]:
 def diff(run_a: RunRecord, run_b: RunRecord) -> dict:
     flat_a = _flatten(run_a.config)
     flat_b = _flatten(run_b.config)
-    changed = [k for k in flat_a if flat_a[k] != flat_b.get(k)]
+    sentinel = object()
+    changed = [
+        k for k in (set(flat_a) | set(flat_b)) if flat_a.get(k, sentinel) != flat_b.get(k, sentinel)
+    ]
     metrics = set(run_a.scores) | set(run_b.scores)
     deltas = {
         m: run_b.scores.get(m, 0.0) - run_a.scores.get(m, 0.0) for m in metrics

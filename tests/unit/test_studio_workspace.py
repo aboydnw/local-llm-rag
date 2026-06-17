@@ -1,3 +1,5 @@
+import pytest
+
 from rag_lab.studio.workspace import Workspace
 
 
@@ -22,3 +24,12 @@ def test_path_helpers(tmp_path):
     assert ws.index_db("abc").name == "abc.db"
     assert ws.index_meta("abc").name == "abc.json"
     assert ws.run_dir("r1").parent == ws.runs_dir
+
+
+@pytest.mark.parametrize("bad", ["..", "../escape", "a/b", "/etc/passwd", ""])
+def test_path_helpers_reject_traversal(tmp_path, bad):
+    ws = Workspace(tmp_path / ".rag-lab")
+    with pytest.raises(ValueError):
+        ws.run_dir(bad)
+    with pytest.raises(ValueError):
+        ws.index_db(bad)

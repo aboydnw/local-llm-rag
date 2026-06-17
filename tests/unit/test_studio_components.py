@@ -1,3 +1,5 @@
+import pytest
+
 from rag_lab.config import Config
 from rag_lab.embedders.fake import FakeEmbedder
 from rag_lab.retrievers.bm25 import BM25Retriever
@@ -34,6 +36,13 @@ def test_build_retriever_hybrid_passes_weights(tmp_path):
     assert isinstance(r, HybridRetriever)
     assert r.vector_weight == 0.7
     assert r.bm25_weight == 0.3
+
+
+def test_build_retriever_rejects_unknown_type(tmp_path):
+    cfg = Config()
+    cfg.retriever.type = "nope"
+    with pytest.raises(ValueError):
+        components.build_retriever(_store(tmp_path), FakeEmbedder(16), cfg)
 
 
 def test_build_embedder_dimension_matches_model():

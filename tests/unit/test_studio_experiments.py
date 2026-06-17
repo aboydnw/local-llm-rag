@@ -1,3 +1,5 @@
+import pytest
+
 from rag_lab.config import Config
 from rag_lab.embedders.fake import FakeEmbedder
 from rag_lab.loaders.markdown import MarkdownLoader
@@ -71,8 +73,14 @@ def test_rename_and_delete(tmp_path):
     assert experiments.list_runs(ws) == []
 
 
+def test_run_eval_refuses_to_overwrite_existing_run(tmp_path):
+    _run(tmp_path, "r1")
+    with pytest.raises(ValueError):
+        _run(tmp_path, "r1")
+
+
 def test_diff_reports_changed_knobs(tmp_path):
-    ws, a = _run(tmp_path, "r1")
+    _, a = _run(tmp_path, "r1")
     other = Config()
     other.retriever.type = "bm25"
     _, b = _run(tmp_path, "r2", config=other)

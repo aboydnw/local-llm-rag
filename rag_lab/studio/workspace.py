@@ -1,6 +1,18 @@
 from pathlib import Path
 
 
+def _safe_segment(name: str) -> str:
+    if (
+        not name
+        or name in (".", "..")
+        or "/" in name
+        or "\\" in name
+        or Path(name).is_absolute()
+    ):
+        raise ValueError(f"unsafe path segment: {name!r}")
+    return name
+
+
 class Workspace:
     """Owns the studio's local `.rag-lab/` working directory."""
 
@@ -28,10 +40,10 @@ class Workspace:
             gitignore.write_text("*\n")
 
     def index_db(self, key: str) -> Path:
-        return self.indexes_dir / f"{key}.db"
+        return self.indexes_dir / f"{_safe_segment(key)}.db"
 
     def index_meta(self, key: str) -> Path:
-        return self.indexes_dir / f"{key}.json"
+        return self.indexes_dir / f"{_safe_segment(key)}.json"
 
     def run_dir(self, run_id: str) -> Path:
-        return self.runs_dir / run_id
+        return self.runs_dir / _safe_segment(run_id)
