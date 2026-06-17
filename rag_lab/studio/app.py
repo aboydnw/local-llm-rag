@@ -1,11 +1,32 @@
+from pathlib import Path
+
 import streamlit as st
+
+from rag_lab import config as config_mod
+from rag_lab.config import Config
+from rag_lab.studio import sidebar, ui_state
+from rag_lab.studio.pages import evaluate, golden, playground, runs
+
+
+def _load_config() -> Config:
+    path = Path("rag.yml")
+    if path.exists():
+        return config_mod.load_config(path)
+    return Config()
 
 
 def main() -> None:
     st.set_page_config(page_title="rag-lab studio", layout="wide")
-    st.title("rag-lab studio")
-    st.write("UI under construction.")
+    ui_state.init_state(st.session_state, _load_config(), "corpus", "golden.yml")
+    sidebar.render(st.session_state)
+
+    pages = st.navigation([
+        st.Page(playground.render, title="Ask playground", icon="💬", url_path="playground", default=True),
+        st.Page(evaluate.render, title="Evaluate", icon="📊", url_path="evaluate"),
+        st.Page(runs.render, title="Runs", icon="🏆", url_path="runs"),
+        st.Page(golden.render, title="Golden set", icon="✏️", url_path="golden"),
+    ])
+    pages.run()
 
 
-if __name__ == "__main__":
-    main()
+main()
