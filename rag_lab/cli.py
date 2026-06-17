@@ -49,13 +49,20 @@ def config_init(
 
 @app.command()
 def ingest(
-    source: Path = typer.Argument(..., help="Directory of markdown files to ingest."),
+    source: Path | None = typer.Argument(None, help="Local directory of markdown files."),
+    repo: str | None = typer.Option(
+        None, "--repo", help="GitHub owner/name. Clones to a temp dir."
+    ),
     config: Path = typer.Option(Path("rag.yml"), "--config"),
     db: Path = typer.Option(Path("rag.db"), "--db"),
 ) -> None:
-    """Ingest markdown documents into a local sqlite-vec index."""
-    if not source.exists() or not source.is_dir():
-        typer.echo(f"Source must be an existing directory: {source}", err=True)
+    """Ingest markdown into a local sqlite-vec index. Provide a local dir or --repo."""
+    import tempfile
+
+    from rag_lab.loaders.github import GitHubLoader
+
+    if (source is None) == (repo is None):
+        typer.echo("Provide exactly one of <source> or --repo.", err=True)
         raise typer.Exit(code=1)
     if not config.exists():
         typer.echo(f"Config file not found: {config}. Run `rag-lab config init`.", err=True)
@@ -71,16 +78,34 @@ def ingest(
         )
         raise typer.Exit(code=1)
 
-    loader = MarkdownLoader(source)
-    chunker = MarkdownAwareChunker(
-        max_tokens=cfg.chunker.max_tokens, overlap=cfg.chunker.overlap
-    )
-    embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
-    store = SqliteVecStore(db, dimension=dimension)
+    loader: object
+    workdir: tempfile.TemporaryDirectory | None = None
+    try:
+        if repo is not None:
+            workdir = tempfile.TemporaryDirectory(prefix="rag-lab-repo-")
+            loader = GitHubLoader(repo, clone_into=Path(workdir.name) / "repo")
+            typer.echo(f"Cloning {repo}...")
+        else:
+            assert source is not None
+            if not source.exists() or not source.is_dir():
+                typer.echo(f"Source must be an existing directory: {source}", err=True)
+                raise typer.Exit(code=1)
+            loader = MarkdownLoader(source)
 
-    typer.echo(f"Ingesting {source} into {db}...")
-    count = ingest_mod.run(loader=loader, chunker=chunker, embedder=embedder, store=store)
-    typer.echo(f"Done. {count} chunks indexed.")
+        chunker = MarkdownAwareChunker(
+            max_tokens=cfg.chunker.max_tokens, overlap=cfg.chunker.overlap
+        )
+        embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
+        store = SqliteVecStore(db, dimension=dimension)
+
+        typer.echo(f"Ingesting into {db}...")
+        count = ingest_mod.run(
+            loader=loader, chunker=chunker, embedder=embedder, store=store
+        )
+        typer.echo(f"Done. {count} chunks indexed.")
+    finally:
+        if workdir is not None:
+            workdir.cleanup()
 
 
 @app.command()
