@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import typer
@@ -7,6 +8,9 @@ from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.embedders.ollama import OllamaEmbedder
+from rag_lab.eval import golden_set as golden_set_mod
+from rag_lab.eval.reporter import MarkdownReporter
+from rag_lab.eval.runner import EvalRunner
 from rag_lab.llms.ollama import OllamaLLM
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.prompts import PromptBuilder
@@ -200,6 +204,83 @@ def inspect_chunks(
         typer.echo(f"{path} [{pos}] {heading}")
         typer.echo(f"  {snippet}")
         typer.echo("")
+
+
+@app.command()
+def eval(  # noqa: A001
+    golden: Path = typer.Option(Path("golden.yml"), "--golden", help="Golden set YAML."),
+    config: Path = typer.Option(Path("rag.yml"), "--config"),
+    db: Path = typer.Option(Path("rag.db"), "--db"),
+    report: Path = typer.Option(
+        Path("eval-reports") / "report.md", "--report", help="Output path for the report."
+    ),
+    previous: Path | None = typer.Option(
+        None, "--previous", help="Previous report to diff against."
+    ),
+    judge: bool = typer.Option(
+        False, "--judge", help="Enable Anthropic LLM judge (requires ANTHROPIC_API_KEY)."
+    ),
+    judge_model: str = typer.Option("claude-sonnet-4-6", "--judge-model"),
+) -> None:
+    """Run the eval harness against a golden set and write a markdown report."""
+    if not golden.exists():
+        typer.echo(f"Golden set not found: {golden}", err=True)
+        raise typer.Exit(code=1)
+    if not config.exists():
+        typer.echo(f"Config file not found: {config}. Run `rag-lab config init`.", err=True)
+        raise typer.Exit(code=1)
+    if not db.exists():
+        typer.echo(f"Index not found: {db}. Run `rag-lab ingest` first.", err=True)
+        raise typer.Exit(code=1)
+    if judge and "ANTHROPIC_API_KEY" not in os.environ:
+        typer.echo("--judge requires ANTHROPIC_API_KEY in the environment.", err=True)
+        raise typer.Exit(code=1)
+
+    cfg = config_mod.load_config(config)
+    dimension = DEFAULT_EMBEDDING_DIMENSIONS.get(cfg.embedder.model)
+    if dimension is None:
+        typer.echo(
+            f"Unknown embedding model '{cfg.embedder.model}'. "
+            f"Add it to DEFAULT_EMBEDDING_DIMENSIONS in cli.py.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    store = SqliteVecStore(db, dimension=dimension)
+    embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
+    retriever = HybridRetriever(
+        vector=VectorRetriever(store=store, embedder=embedder),
+        bm25=BM25Retriever(store=store),
+        vector_weight=cfg.retriever.vector_weight,
+        bm25_weight=cfg.retriever.bm25_weight,
+    )
+    llm = OllamaLLM(model=cfg.llm.model)
+
+    judge_scorer = None
+    if judge:
+        from rag_lab.eval.scorers.llm_judge import LLMJudge
+
+        judge_scorer = LLMJudge(model=judge_model)
+    runner = EvalRunner(retriever=retriever, llm=llm, k=cfg.retriever.k, judge=judge_scorer)
+
+    items = golden_set_mod.load_golden_set(golden)
+    typer.echo(f"Running {len(items)} questions...")
+    results = runner.run(items)
+
+    r = cfg.retriever
+    config_summary = (
+        f"chunker={cfg.chunker.type}@{cfg.chunker.max_tokens} "
+        f"retriever={r.type}(v={r.vector_weight},b={r.bm25_weight}) "
+        f"llm={cfg.llm.model} embedder={cfg.embedder.model}"
+    )
+    report.parent.mkdir(parents=True, exist_ok=True)
+    MarkdownReporter().write(
+        results=results,
+        config_summary=config_summary,
+        out_path=report,
+        previous_report=previous,
+    )
+    typer.echo(f"Report written to {report}")
 
 
 if __name__ == "__main__":

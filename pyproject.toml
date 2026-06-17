@@ -24,6 +24,9 @@ dev = [
     "pytest-cov>=5",
     "ruff>=0.5",
 ]
+judge = [
+    "anthropic>=0.40",
+]
 
 [project.scripts]
 rag-lab = "rag_lab.cli:app"
