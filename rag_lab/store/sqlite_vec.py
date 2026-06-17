@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import sqlite3
 import struct
 from pathlib import Path
@@ -11,6 +12,17 @@ from rag_lab.types import Chunk
 
 def _vec_to_blob(vector: list[float]) -> bytes:
     return struct.pack(f"{len(vector)}f", *vector)
+
+
+def _to_fts_query(query: str) -> str:
+    """Turn free-text into a safe FTS5 MATCH expression.
+
+    User questions contain punctuation (``?``, ``-``, quotes) that FTS5 parses as
+    query syntax. We extract bare word tokens, quote each as a phrase, and OR them
+    so any keyword match contributes.
+    """
+    tokens = re.findall(r"\w+", query)
+    return " OR ".join(f'"{token}"' for token in tokens)
 
 
 def _chunk_id(chunk: Chunk) -> str:
@@ -61,6 +73,15 @@ class SqliteVecStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+                    chunk_id UNINDEXED,
+                    text,
+                    tokenize = 'porter'
+                )
+                """
+            )
             conn.commit()
 
     def upsert(self, chunks: list[Chunk], vectors: list[list[float]]) -> None:
@@ -89,6 +110,11 @@ class SqliteVecStore:
                         json.dumps(chunk.metadata),
                     ),
                 )
+                conn.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (cid,))
+                conn.execute(
+                    "INSERT INTO chunks_fts(chunk_id, text) VALUES(?, ?)",
+                    (cid, chunk.text),
+                )
                 row = conn.execute(
                     "SELECT rowid FROM vec_ids WHERE chunk_id = ?", (cid,)
                 ).fetchone()
@@ -113,6 +139,43 @@ class SqliteVecStore:
         with self._connect() as conn:
             (n,) = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
             return int(n)
+
+    def query_bm25(self, query: str, k: int) -> list[tuple[Chunk, float]]:
+        match = _to_fts_query(query)
+        if not match:
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT chunk_id, rank
+                FROM chunks_fts
+                WHERE chunks_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (match, k),
+            ).fetchall()
+            out: list[tuple[Chunk, float]] = []
+            for chunk_id, rank in rows:
+                cdata = conn.execute(
+                    "SELECT doc_path, heading_path, position, text, metadata "
+                    "FROM chunks WHERE id = ?",
+                    (chunk_id,),
+                ).fetchone()
+                doc_path, heading_path_json, position, text, metadata_json = cdata
+                out.append(
+                    (
+                        Chunk(
+                            text=text,
+                            doc_path=Path(doc_path),
+                            heading_path=tuple(json.loads(heading_path_json)),
+                            position=position,
+                            metadata=json.loads(metadata_json),
+                        ),
+                        float(-rank),
+                    )
+                )
+            return out
 
     def query_vector(self, vector: list[float], k: int) -> list[tuple[Chunk, float]]:
         with self._connect() as conn:

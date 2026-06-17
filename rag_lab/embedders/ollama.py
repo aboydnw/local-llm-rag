@@ -1,11 +1,14 @@
 from functools import lru_cache
 
+import httpx
 import ollama
+
+_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=None, pool=None)
 
 
 @lru_cache(maxsize=1)
 def _client() -> ollama.Client:
-    return ollama.Client()
+    return ollama.Client(timeout=_TIMEOUT)
 
 
 class OllamaEmbedder:
