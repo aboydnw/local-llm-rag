@@ -263,5 +263,21 @@ def eval(  # noqa: A001
     typer.echo(f"Report written to {report}")
 
 
+@app.command()
+def studio(
+    port: int = typer.Option(8501, "--port", help="Port for the Streamlit server."),
+) -> None:
+    """Launch the rag-lab studio web interface (requires the 'studio' extra)."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    app_path = Path(__file__).parent / "studio" / "app.py"
+    code = subprocess.call(
+        [sys.executable, "-m", "streamlit", "run", str(app_path), "--server.port", str(port)]
+    )
+    raise typer.Exit(code=code)
+
+
 if __name__ == "__main__":
     app()

@@ -27,6 +27,9 @@ dev = [
 judge = [
     "anthropic>=0.40",
 ]
+studio = [
+    "streamlit>=1.36",
+]
 
 [project.scripts]
 rag-lab = "rag_lab.cli:app"
