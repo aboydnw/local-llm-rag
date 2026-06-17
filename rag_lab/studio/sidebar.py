@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import streamlit as st
+import yaml
 
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config, config_summary
 from rag_lab.studio import indexer as indexer_mod
@@ -7,14 +10,17 @@ from rag_lab.studio.workspace import Workspace
 
 
 def render(session) -> Config:
+    """Render the config sidebar and return the current ``Config`` from session state."""
     cfg: Config = session["config"]
     st.sidebar.header("Corpus")
     session["corpus"] = st.sidebar.text_input("Corpus directory", value=session["corpus"])
     session["golden"] = st.sidebar.text_input("Golden set", value=session["golden"])
 
     st.sidebar.header("Chunker  🟠 re-index")
-    cfg.chunker.type = st.sidebar.selectbox("type", ["markdown_aware", "fixed"],
-                                            index=["markdown_aware", "fixed"].index(cfg.chunker.type))
+    chunker_types = ["markdown_aware", "fixed"]
+    cfg.chunker.type = st.sidebar.selectbox(
+        "type", chunker_types, index=chunker_types.index(cfg.chunker.type)
+    )
     cfg.chunker.max_tokens = st.sidebar.slider("max_tokens", 64, 2048, cfg.chunker.max_tokens, 32)
     cfg.chunker.overlap = st.sidebar.slider("overlap", 0, 256, cfg.chunker.overlap, 8)
 
@@ -31,7 +37,8 @@ def render(session) -> Config:
     rtypes = ["hybrid", "vector", "bm25"]
     cfg.retriever.type = st.sidebar.radio("type", rtypes, index=rtypes.index(cfg.retriever.type))
     vector_weight = st.sidebar.slider("vector_weight", 0.0, 1.0, cfg.retriever.vector_weight, 0.05)
-    cfg.retriever.vector_weight, cfg.retriever.bm25_weight = ui_state.normalized_weights(vector_weight)
+    weights = ui_state.normalized_weights(vector_weight)
+    cfg.retriever.vector_weight, cfg.retriever.bm25_weight = weights
     st.sidebar.caption(f"bm25_weight = {cfg.retriever.bm25_weight}")
     cfg.retriever.k = st.sidebar.slider("k", 1, 20, cfg.retriever.k)
 
@@ -46,8 +53,6 @@ def render(session) -> Config:
 
     col1, col2 = st.sidebar.columns(2)
     if col1.button("Save to rag.yml"):
-        import yaml
-        from pathlib import Path
         Path("rag.yml").write_text(yaml.safe_dump(cfg.model_dump()))
         st.sidebar.toast("Saved rag.yml")
     if col2.button("Build index"):

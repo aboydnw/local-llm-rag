@@ -6,6 +6,7 @@ from rag_lab.studio.workspace import Workspace
 
 
 def render() -> None:
+    """Render the Runs page: leaderboard, two-run compare, and run management."""
     st.title("Runs")
     ws = Workspace.default()
     runs = experiments.list_runs(ws)

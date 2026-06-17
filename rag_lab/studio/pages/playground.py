@@ -8,6 +8,7 @@ from rag_lab.studio.workspace import Workspace
 
 
 def render() -> None:
+    """Render the Ask playground: retrieve chunks and generate an answer for a question."""
     st.title("Ask playground")
     cfg = st.session_state["config"]
     corpus = st.session_state["corpus"]
@@ -18,15 +19,16 @@ def render() -> None:
     if status.needs_build:
         st.warning("This config has no built index yet. Use **Build index** in the sidebar.")
         return
+    question = question.strip()
     if not question:
         return
 
     with st.spinner("Retrieving and generating..."):
-        db_path = indexer_mod.ensure_index(ws, corpus, cfg)
-        embedder = components.build_embedder(cfg)
-        store = SqliteVecStore(db_path, dimension=embedder.dimension)
-        retriever = components.build_retriever(store, embedder, cfg)
         try:
+            db_path = indexer_mod.ensure_index(ws, corpus, cfg)
+            embedder = components.build_embedder(cfg)
+            store = SqliteVecStore(db_path, dimension=embedder.dimension)
+            retriever = components.build_retriever(store, embedder, cfg)
             results = retriever.retrieve(question, k=cfg.retriever.k)
             prompt = PromptBuilder().build(question=question, results=results)
             answer = components.build_llm(cfg).generate(prompt)

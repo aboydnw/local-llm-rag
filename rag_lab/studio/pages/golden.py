@@ -7,6 +7,7 @@ from rag_lab.studio import golden_io
 
 
 def render() -> None:
+    """Render the Golden set editor: view, add, edit, and delete golden items."""
     st.title("Golden set")
     path = Path(st.session_state["golden"])
     items = golden_io.load_items(path)
@@ -33,16 +34,20 @@ def render() -> None:
     ideal_answer = st.text_area("ideal_answer", value=existing.ideal_answer if existing else "")
 
     c1, c2 = st.columns(2)
-    if c1.button("Save item", type="primary") and item_id and question:
+    if c1.button("Save item", type="primary") and item_id.strip() and question.strip():
+        normalized_id = item_id.strip()
         item = GoldenItem(
-            id=item_id,
-            question=question,
-            ideal_docs=[s for s in ideal_docs.splitlines() if s.strip()],
-            must_mention=[s for s in must_mention.splitlines() if s.strip()],
-            ideal_answer=ideal_answer,
+            id=normalized_id,
+            question=question.strip(),
+            ideal_docs=[s.strip() for s in ideal_docs.splitlines() if s.strip()],
+            must_mention=[s.strip() for s in must_mention.splitlines() if s.strip()],
+            ideal_answer=ideal_answer.strip(),
         )
-        golden_io.save_items(path, golden_io.upsert_item(items, item))
-        st.success(f"Saved {item_id} to {path}")
+        updated = golden_io.upsert_item(items, item)
+        if existing and existing.id != normalized_id:
+            updated = golden_io.delete_item(updated, existing.id)
+        golden_io.save_items(path, updated)
+        st.success(f"Saved {normalized_id} to {path}")
         st.rerun()
     if c2.button("Delete item") and existing:
         golden_io.save_items(path, golden_io.delete_item(items, existing.id))

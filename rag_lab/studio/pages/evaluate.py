@@ -10,6 +10,7 @@ from rag_lab.studio.workspace import Workspace
 
 
 def render() -> None:
+    """Render the Evaluate page: run the golden set and show aggregates + report."""
     st.title("Evaluate")
     cfg = st.session_state["config"]
     corpus = st.session_state["corpus"]
@@ -49,7 +50,12 @@ def render() -> None:
     run_id = st.session_state.get("last_run_id")
     if run_id:
         ws = Workspace.default()
-        record = experiments.load_run(ws, run_id)
+        try:
+            record = experiments.load_run(ws, run_id)
+        except Exception:  # noqa: BLE001
+            st.session_state.pop("last_run_id", None)
+            st.warning("The last run is no longer available.")
+            return
         st.subheader("Aggregates")
         st.table({k: [round(v, 3)] for k, v in record.scores.items()})
         st.subheader("Report")
