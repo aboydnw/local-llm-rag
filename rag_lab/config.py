@@ -35,6 +35,31 @@ class Config(BaseModel):
     retriever: RetrieverConfig = RetrieverConfig()
 
 
+EMBEDDING_DIMENSIONS: dict[str, int] = {
+    "nomic-embed-text": 768,
+    "mxbai-embed-large": 1024,
+    "all-minilm": 384,
+}
+
+
+def embedding_dimension(model: str) -> int:
+    """Return the vector dimension for a known Ollama embedding model."""
+    try:
+        return EMBEDDING_DIMENSIONS[model]
+    except KeyError:
+        raise ValueError(f"Unknown embedding model: {model}") from None
+
+
+def config_summary(config: Config) -> str:
+    """One-line human summary of the swappable knobs in a config."""
+    r = config.retriever
+    return (
+        f"chunker={config.chunker.type}@{config.chunker.max_tokens} "
+        f"retriever={r.type}(v={r.vector_weight},b={r.bm25_weight}) "
+        f"llm={config.llm.model} embedder={config.embedder.model}"
+    )
+
+
 DEFAULT_CONFIG_YAML = """\
 chunker:
   type: markdown_aware
