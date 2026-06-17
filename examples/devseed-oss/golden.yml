@@ -1,0 +1,66 @@
+# DevSeed OSS golden set (starter — 6 of a target 20).
+#
+# Covers titiler, eoAPI, and stac-fastapi, with one "trap" question whose answer
+# is not in the corpus. Expand to ~20 following this format.
+#
+# `ideal_docs` must match doc_path exactly as stored at ingest time. This set was
+# built against a corpus laid out as:
+#
+#   corpus/titiler/        (git clone developmentseed/titiler)
+#   corpus/eoAPI/          (git clone developmentseed/eoAPI)
+#   corpus/stac-fastapi/   (git clone stac-utils/stac-fastapi)
+#
+# then ingested with `rag-lab ingest corpus`. If you ingest a different layout,
+# update the `corpus/...` prefixes to match.
+
+- id: titiler-what
+  question: "What is titiler?"
+  ideal_docs: ["corpus/titiler/README.md"]
+  must_mention: ["FastAPI", "tile", "Rasterio"]
+  ideal_answer: |
+    titiler is a modern dynamic tile server: a set of Python modules for building
+    FastAPI applications that serve map tiles from raster data, built on top of
+    Rasterio/GDAL and rio-tiler.
+
+- id: titiler-lambda
+  question: "How do I deploy titiler on AWS Lambda?"
+  ideal_docs: ["corpus/titiler/docs/src/deployment/aws/lambda.md"]
+  must_mention: ["Mangum", "Lambda"]
+  ideal_answer: |
+    Wrap the titiler FastAPI app with the Mangum adapter to produce a Lambda
+    handler, then deploy it with the AWS CDK, which packages the app and creates
+    the Lambda and API Gateway resources.
+
+- id: titiler-factories
+  question: "What are titiler's endpoint factories?"
+  ideal_docs: ["corpus/titiler/docs/src/advanced/endpoints_factories.md"]
+  must_mention: ["TilerFactory", "router"]
+  ideal_answer: |
+    Endpoint factories are helper classes (e.g. TilerFactory, MosaicTilerFactory)
+    that create a FastAPI router with a set of tiling endpoints. They are built
+    around rio-tiler readers and use dependency injection to configure options.
+
+- id: eoapi-what
+  question: "What is eoAPI?"
+  ideal_docs: ["corpus/eoAPI/README.md"]
+  must_mention: ["STAC", "raster", "vector"]
+  ideal_answer: |
+    eoAPI combines several projects into a full Earth Observation API: a pgSTAC
+    database, a STAC metadata API, raster tiles via titiler-pgstac, and OGC
+    Features / vector tiles via tipg.
+
+- id: stac-fastapi-what
+  question: "What is stac-fastapi?"
+  ideal_docs: ["corpus/stac-fastapi/README.md"]
+  must_mention: ["STAC", "FastAPI", "backend"]
+  ideal_answer: |
+    stac-fastapi is a Python library for building a STAC-compliant FastAPI
+    application. A running server also requires a backend (such as pgstac or
+    elasticsearch/opensearch) for STAC metadata storage.
+
+- id: trap-not-in-docs
+  question: "What is the best taco in Seattle?"
+  ideal_docs: []
+  must_mention: []
+  ideal_answer: |
+    Honestly state that the documentation does not cover this.
