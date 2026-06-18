@@ -33,7 +33,7 @@ The product is three loops, each a CLI subcommand:
 | **Query** | `rag-lab ask "question"` | Retrieve relevant chunks, generate an answer with a local LLM, print it with citations. |
 | **Eval** | `rag-lab eval` | Run a golden Q&A set through the query loop and write a scored report. |
 
-Supporting commands: `rag-lab inspect chunks` (debug what got indexed) and `rag-lab config init` (write an editable config).
+Supporting commands: `rag-lab inspect chunks` (debug what got indexed), `rag-lab config init` (write an editable config), and `rag-lab studio` (a local web cockpit over all three loops — see Current status).
 
 ## Requirements
 
@@ -48,7 +48,9 @@ Supporting commands: `rag-lab inspect chunks` (debug what got indexed) and `rag-
 - A README that takes a new user from install to first answer in under five minutes (assuming Ollama is installed).
 
 ### Explicitly out of scope for v1
-Multi-turn chat, cross-encoder reranking, query rewriting/HyDE, web crawler and PDF loaders, cloud LLM/embedding fallback, web UI, multi-corpus operation, and incremental re-indexing. Each is a natural follow-up the eval harness can later justify.
+Multi-turn chat, cross-encoder reranking, query rewriting/HyDE, web crawler and PDF loaders, cloud LLM/embedding fallback, multi-corpus operation, and incremental re-indexing. Each is a natural follow-up the eval harness can later justify.
+
+A local web UI (**studio**) was an explicit post-v1 follow-up and has since shipped — see below.
 
 ## Success criteria
 
@@ -62,7 +64,9 @@ v1 ships when:
 
 ## Current status
 
-The **ingest loop** is built and tested (loader, markdown-aware chunker, Ollama embedder, sqlite-vec store, `ingest` command). The **query loop** and **eval loop** — the two pillars that carry the value prop — are not yet implemented.
+All three loops are built and tested: **ingest** (loader, markdown-aware chunker, Ollama embedder, sqlite-vec store), **query** (hybrid retrieval, cited answers via a local LLM), and **eval** (golden set, retrieval + answer scorers, optional LLM judge, committed markdown reports).
+
+Beyond v1, **studio** (`rag-lab studio`) has shipped: a local Streamlit interface to turn every config knob, edit the golden set, run evals, and compare runs on a leaderboard. It reuses the same swappable components and adds a gitignored `.rag-lab/` workspace for cached indexes and run history. The studio is an optional extra; the core CLI runs without it.
 
 ## Reference
 
