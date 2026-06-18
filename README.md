@@ -61,3 +61,27 @@ optional model-graded judge). The `--judge` flag needs the optional `judge` extr
 `examples/devseed-oss/` holds a golden set covering titiler, eoAPI, and stac-fastapi.
 `eval-reports/` is the project's eval trail — every report is committed so you can see how a
 change moved the metrics.
+
+## Studio — the visual cockpit
+
+`rag-lab studio` is a local web interface for turning every knob, editing the eval set, and
+seeing results — built to help you understand and fine-tune the system by experiment.
+
+```bash
+uv sync --extra studio        # one-time: install the studio dependencies
+uv run rag-lab studio         # launches a browser at http://localhost:8501
+```
+
+It runs fully local (Streamlit, no JS toolchain, no API keys) and has four surfaces:
+
+- **Sidebar config knobs** — chunker, embedder, LLM, and retriever settings, each tagged
+  🟢 *cheap* (re-run eval only) or 🟠 *needs re-index* (rebuild the index). Save back to `rag.yml`.
+- **Ask playground** — one question, live; see the retrieved chunks and the generated answer.
+- **Evaluate** — run the golden set through the current config and see scored results.
+- **Runs** — every eval run is saved with its config; a leaderboard lets you compare any two
+  and see which knob moved which metric.
+- **Golden set editor** — add/edit golden questions in a form; writes back to `golden.yml`.
+
+Studio caches each index keyed by its corpus + chunker + embedder under a gitignored
+`.rag-lab/` directory, so repeating a config reuses its index instead of rebuilding. The
+studio dependencies are optional — the core CLI installs and runs without them.
