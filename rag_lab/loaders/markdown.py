@@ -5,6 +5,8 @@ import frontmatter
 
 from rag_lab.types import Document
 
+_EXCLUDED_DIRS = {".venv", "venv", "node_modules", ".git", "__pycache__", ".tox"}
+
 
 class MarkdownLoader:
     """Recursively load .md files from a directory."""
@@ -14,6 +16,8 @@ class MarkdownLoader:
 
     def load(self) -> Iterator[Document]:
         for path in sorted(self.root.rglob("*.md")):
+            if _EXCLUDED_DIRS.intersection(path.parts):
+                continue
             post = frontmatter.load(path)
             metadata = {k: str(v) for k, v in post.metadata.items()}
             yield Document(path=path, text=post.content, metadata=metadata)
