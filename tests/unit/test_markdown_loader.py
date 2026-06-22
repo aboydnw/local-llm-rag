@@ -32,3 +32,14 @@ def test_ignores_non_markdown_files(tmp_path: Path) -> None:
     docs = list(loader.load())
     assert len(docs) == 1
     assert docs[0].path.name == "a.md"
+
+
+def test_excludes_venv_and_other_tooling_dirs(tmp_path: Path) -> None:
+    (tmp_path / "real.md").write_text("# Real")
+    for excluded in (".venv", "venv", "node_modules", ".git", "__pycache__", ".tox"):
+        d = tmp_path / excluded
+        d.mkdir()
+        (d / "noise.md").write_text("# Should be ignored")
+    loader = MarkdownLoader(tmp_path)
+    docs = list(loader.load())
+    assert [d.path.name for d in docs] == ["real.md"]
