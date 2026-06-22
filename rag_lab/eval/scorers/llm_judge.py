@@ -3,6 +3,8 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
+from rag_lab.llms.base import LLM
+
 JUDGE_PROMPT = """\
 You are grading a documentation-assistant answer.
 
@@ -45,7 +47,19 @@ _SCORE_RE = re.compile(r"SCORE:\s*([1-5])", re.IGNORECASE)
 _REASON_RE = re.compile(r"Reason:\s*(.+)", re.IGNORECASE)
 
 
+def parse_judge_response(text: str) -> JudgeResult:
+    """Extract the 1-5 score and one-line reason from a judge model's reply."""
+    score_match = _SCORE_RE.search(text)
+    reason_match = _REASON_RE.search(text)
+    return JudgeResult(
+        score=int(score_match.group(1)) if score_match else 0,
+        reason=reason_match.group(1).strip() if reason_match else text.strip(),
+    )
+
+
 class LLMJudge:
+    """Grades answers with Anthropic's API. Requires ``ANTHROPIC_API_KEY``."""
+
     def __init__(self, model: str = "claude-sonnet-4-6") -> None:
         self.model = model
 
@@ -68,9 +82,21 @@ class LLMJudge:
         text = "".join(
             getattr(b, "text", "") for b in blocks if getattr(b, "type", "text") == "text"
         )
-        score_match = _SCORE_RE.search(text)
-        reason_match = _REASON_RE.search(text)
-        return JudgeResult(
-            score=int(score_match.group(1)) if score_match else 0,
-            reason=reason_match.group(1).strip() if reason_match else text.strip(),
+        return parse_judge_response(text)
+
+
+class OllamaJudge:
+    """Grades answers with a local Ollama model. No API key required."""
+
+    def __init__(self, llm: LLM) -> None:
+        self._llm = llm
+
+    def score(self, question: str, actual_answer: str, ideal_answer: str) -> JudgeResult:
+        text = self._llm.generate(
+            JUDGE_PROMPT.format(
+                question=question,
+                actual_answer=actual_answer,
+                ideal_answer=ideal_answer,
+            )
         )
+        return parse_judge_response(text)

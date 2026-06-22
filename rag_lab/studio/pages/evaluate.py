@@ -17,10 +17,23 @@ def render() -> None:
     golden = Path(st.session_state["golden"])
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
-    has_key = "ANTHROPIC_API_KEY" in os.environ
-    judge_on = st.toggle("Use LLM judge (Anthropic, opt-in)", value=False, disabled=not has_key)
-    if not has_key:
-        st.caption("Set ANTHROPIC_API_KEY to enable the LLM judge.")
+    has_key = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+    judge_on = st.toggle(
+        "Use LLM judge", value=False,
+        help="Grade each answer 1-5 against the golden ideal answer. Adds an LLM call "
+        "per question, so it's slower than the retrieval metrics.",
+    )
+    local_label = f"Local — Ollama ({cfg.llm.model})"
+    anthropic_label = "Anthropic — claude-sonnet-4-6"
+    judge_choice = local_label
+    if judge_on:
+        options = [local_label] + ([anthropic_label] if has_key else [])
+        judge_choice = st.radio(
+            "Judge model", options,
+            help="Local runs fully offline via Ollama. Anthropic needs ANTHROPIC_API_KEY.",
+        )
+        if not has_key:
+            st.caption("Set ANTHROPIC_API_KEY to also enable the Anthropic judge.")
 
     if st.button("Run eval", type="primary"):
         if not golden.exists():
@@ -28,8 +41,13 @@ def render() -> None:
             return
         judge = None
         if judge_on:
-            from rag_lab.eval.scorers.llm_judge import LLMJudge
-            judge = LLMJudge(model="claude-sonnet-4-6")
+            if judge_choice == anthropic_label:
+                from rag_lab.eval.scorers.llm_judge import LLMJudge
+                judge = LLMJudge(model="claude-sonnet-4-6")
+            else:
+                from rag_lab.eval.scorers.llm_judge import OllamaJudge
+                from rag_lab.studio import components
+                judge = OllamaJudge(components.build_llm(cfg))
         ws = Workspace.default()
         ws.initialize()
         with st.spinner("Running eval (this builds the index if needed)..."):

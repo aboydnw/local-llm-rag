@@ -13,52 +13,97 @@ def render(session) -> Config:
     """Render the config sidebar and return the current ``Config`` from session state."""
     cfg: Config = session["config"]
     st.sidebar.header("Corpus")
-    session["corpus"] = st.sidebar.text_input("Corpus directory", value=session["corpus"])
-    session["golden"] = st.sidebar.text_input("Golden set", value=session["golden"])
+    session["corpus"] = st.sidebar.text_input(
+        "Corpus directory",
+        value=session["corpus"],
+        help="Folder of markdown (.md) files you want to ask questions about. "
+        "Searched recursively. Defaults to the current directory.",
+    ).strip()
+    session["golden"] = st.sidebar.text_input(
+        "Golden set",
+        value=session["golden"],
+        help="YAML file of question/expected-answer pairs used to score eval runs. "
+        "Optional — leave as-is if you only want to ask questions.",
+    )
 
     st.sidebar.header("Chunker  🟠 re-index")
     chunker_types = ["markdown_aware", "fixed"]
     cfg.chunker.type = st.sidebar.selectbox(
-        "type", chunker_types, index=chunker_types.index(cfg.chunker.type)
+        "type", chunker_types, index=chunker_types.index(cfg.chunker.type),
+        help="How documents are split into chunks. 'markdown_aware' splits on headings; "
+        "'fixed' splits on a flat token count.",
     )
-    cfg.chunker.max_tokens = st.sidebar.slider("max_tokens", 64, 2048, cfg.chunker.max_tokens, 32)
-    cfg.chunker.overlap = st.sidebar.slider("overlap", 0, 256, cfg.chunker.overlap, 8)
+    cfg.chunker.max_tokens = st.sidebar.slider(
+        "max_tokens", 64, 2048, cfg.chunker.max_tokens, 32,
+        help="Largest chunk size, in tokens. Bigger chunks = more context per result "
+        "but less precise retrieval.",
+    )
+    cfg.chunker.overlap = st.sidebar.slider(
+        "overlap", 0, 256, cfg.chunker.overlap, 8,
+        help="Tokens repeated between adjacent chunks so ideas spanning a boundary "
+        "aren't lost.",
+    )
 
     st.sidebar.header("Embedder  🟠 re-index")
     models = list(EMBEDDING_DIMENSIONS)
-    cfg.embedder.model = st.sidebar.selectbox("embedding model", models,
-                                              index=models.index(cfg.embedder.model)
-                                              if cfg.embedder.model in models else 0)
+    cfg.embedder.model = st.sidebar.selectbox(
+        "embedding model", models,
+        index=models.index(cfg.embedder.model) if cfg.embedder.model in models else 0,
+        help="Ollama model that turns text into vectors for semantic search. "
+        "Changing it requires a rebuild.",
+    )
 
     st.sidebar.header("LLM  🟢 cheap")
-    cfg.llm.model = st.sidebar.text_input("llm model", value=cfg.llm.model)
+    cfg.llm.model = st.sidebar.text_input(
+        "llm model", value=cfg.llm.model,
+        help="Ollama model that writes the final answer from retrieved chunks. "
+        "Cheap to change — no rebuild needed.",
+    )
 
     st.sidebar.header("Retriever  🟢 cheap")
     rtypes = ["hybrid", "vector", "bm25"]
-    cfg.retriever.type = st.sidebar.radio("type", rtypes, index=rtypes.index(cfg.retriever.type))
-    vector_weight = st.sidebar.slider("vector_weight", 0.0, 1.0, cfg.retriever.vector_weight, 0.05)
+    cfg.retriever.type = st.sidebar.radio(
+        "type", rtypes, index=rtypes.index(cfg.retriever.type),
+        help="How chunks are found: 'vector' = semantic similarity, 'bm25' = keyword "
+        "match, 'hybrid' = a blend of both.",
+    )
+    vector_weight = st.sidebar.slider(
+        "vector_weight", 0.0, 1.0, cfg.retriever.vector_weight, 0.05,
+        help="In hybrid mode, how much to favor semantic search over keyword search. "
+        "1.0 = pure vector, 0.0 = pure keyword.",
+    )
     weights = ui_state.normalized_weights(vector_weight)
     cfg.retriever.vector_weight, cfg.retriever.bm25_weight = weights
     st.sidebar.caption(f"bm25_weight = {cfg.retriever.bm25_weight}")
-    cfg.retriever.k = st.sidebar.slider("k", 1, 20, cfg.retriever.k)
+    cfg.retriever.k = st.sidebar.slider(
+        "k", 1, 20, cfg.retriever.k,
+        help="How many chunks to retrieve and feed to the LLM for each question.",
+    )
 
     ws = Workspace.default()
     ws.initialize()
-    status = indexer_mod.status(ws, session["corpus"], cfg)
     st.sidebar.divider()
-    if status.cached:
-        st.sidebar.success("Index: ✓ cached")
+    corpus_error = indexer_mod.validate_corpus(session["corpus"])
+    if corpus_error is not None:
+        st.sidebar.error(corpus_error)
     else:
-        st.sidebar.warning("⚠ this config needs a build")
+        status = indexer_mod.status(ws, session["corpus"], cfg)
+        if status.cached:
+            st.sidebar.success("Index: ✓ cached")
+        else:
+            st.sidebar.warning("⚠ this config needs a build")
 
     col1, col2 = st.sidebar.columns(2)
     if col1.button("Save to rag.yml"):
         Path("rag.yml").write_text(yaml.safe_dump(cfg.model_dump()))
         st.sidebar.toast("Saved rag.yml")
-    if col2.button("Build index"):
-        with st.spinner("Building index..."):
-            indexer_mod.ensure_index(ws, session["corpus"], cfg)
-        st.sidebar.toast("Index built")
+    if col2.button("Build index", disabled=corpus_error is not None):
+        try:
+            with st.spinner("Building index..."):
+                indexer_mod.ensure_index(ws, session["corpus"], cfg)
+            st.sidebar.toast("Index built")
+        except ValueError as exc:
+            st.sidebar.error(str(exc))
 
     st.sidebar.caption(config_summary(cfg))
     session["config"] = cfg
