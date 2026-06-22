@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from rag_lab.studio import models
 from rag_lab.studio.models import PullEvent
 
@@ -22,3 +24,15 @@ def test_pull_event_is_frozen():
     ev = PullEvent(status="downloading", fraction=0.5)
     assert ev.status == "downloading"
     assert ev.fraction == 0.5
+
+
+def test_installed_models_reads_names_from_client():
+    client = SimpleNamespace(
+        list=lambda: SimpleNamespace(
+            models=[
+                SimpleNamespace(model="qwen2.5:3b"),
+                SimpleNamespace(model="nomic-embed-text:latest"),
+            ]
+        )
+    )
+    assert models.installed_models(client) == ["qwen2.5:3b", "nomic-embed-text:latest"]
