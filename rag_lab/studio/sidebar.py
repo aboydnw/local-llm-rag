@@ -18,7 +18,7 @@ def render(session) -> Config:
         value=session["corpus"],
         help="Folder of markdown (.md) files you want to ask questions about. "
         "Searched recursively. Defaults to the current directory.",
-    )
+    ).strip()
     session["golden"] = st.sidebar.text_input(
         "Golden set",
         value=session["golden"],

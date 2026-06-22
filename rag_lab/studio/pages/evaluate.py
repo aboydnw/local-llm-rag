@@ -17,7 +17,7 @@ def render() -> None:
     golden = Path(st.session_state["golden"])
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
-    has_key = "ANTHROPIC_API_KEY" in os.environ
+    has_key = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
     judge_on = st.toggle(
         "Use LLM judge", value=False,
         help="Grade each answer 1-5 against the golden ideal answer. Adds an LLM call "

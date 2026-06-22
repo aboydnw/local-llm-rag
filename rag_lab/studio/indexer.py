@@ -37,7 +37,8 @@ def status(workspace: Workspace, corpus: str, config: Config) -> IndexStatus:
 
 def validate_corpus(corpus: str) -> str | None:
     """Return a human-readable reason the corpus can't be indexed, or ``None`` if it can."""
-    if not corpus.strip():
+    corpus = corpus.strip()
+    if not corpus:
         return "Enter a corpus directory to index."
     path = Path(corpus)
     if not path.exists():
@@ -53,7 +54,7 @@ def _default_loader(corpus: str) -> MarkdownLoader:
     reason = validate_corpus(corpus)
     if reason is not None:
         raise ValueError(reason)
-    return MarkdownLoader(Path(corpus))
+    return MarkdownLoader(Path(corpus.strip()))
 
 
 def build_index(
