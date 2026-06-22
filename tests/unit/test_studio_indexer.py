@@ -14,6 +14,31 @@ def _corpus(tmp_path):
     return d
 
 
+def test_validate_corpus_accepts_dir_with_markdown(tmp_path):
+    assert indexer.validate_corpus(str(_corpus(tmp_path))) is None
+
+
+def test_validate_corpus_rejects_blank():
+    assert indexer.validate_corpus("  ") is not None
+
+
+def test_validate_corpus_rejects_missing_path(tmp_path):
+    assert indexer.validate_corpus(str(tmp_path / "nope")) is not None
+
+
+def test_validate_corpus_rejects_file(tmp_path):
+    f = tmp_path / "a.md"
+    f.write_text("# hi")
+    assert indexer.validate_corpus(str(f)) is not None
+
+
+def test_validate_corpus_rejects_dir_without_markdown(tmp_path):
+    d = tmp_path / "empty"
+    d.mkdir()
+    (d / "notes.txt").write_text("not markdown")
+    assert indexer.validate_corpus(str(d)) is not None
+
+
 def test_cache_key_stable_for_same_config():
     cfg = Config()
     assert indexer.cache_key("corpus", cfg) == indexer.cache_key("corpus", cfg)

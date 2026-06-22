@@ -35,11 +35,25 @@ def status(workspace: Workspace, corpus: str, config: Config) -> IndexStatus:
     return IndexStatus(cache_key=key, cached=cached, needs_build=not cached)
 
 
-def _default_loader(corpus: str) -> MarkdownLoader:
+def validate_corpus(corpus: str) -> str | None:
+    """Return a human-readable reason the corpus can't be indexed, or ``None`` if it can."""
+    if not corpus.strip():
+        return "Enter a corpus directory to index."
     path = Path(corpus)
+    if not path.exists():
+        return f"Corpus directory not found: {corpus}"
     if not path.is_dir():
-        raise ValueError(f"corpus is not a local directory: {corpus}")
-    return MarkdownLoader(path)
+        return f"Corpus must be a directory, not a file: {corpus}"
+    if not any(path.rglob("*.md")):
+        return f"No markdown (.md) files found in: {corpus}"
+    return None
+
+
+def _default_loader(corpus: str) -> MarkdownLoader:
+    reason = validate_corpus(corpus)
+    if reason is not None:
+        raise ValueError(reason)
+    return MarkdownLoader(Path(corpus))
 
 
 def build_index(

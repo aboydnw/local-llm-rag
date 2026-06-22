@@ -19,7 +19,9 @@ def _load_config() -> Config:
 def main() -> None:
     """Initialize session state, render the sidebar, and route the studio pages."""
     st.set_page_config(page_title="rag-lab studio", layout="wide")
-    ui_state.init_state(st.session_state, _load_config(), "corpus", "golden.yml")
+    ui_state.init_state(
+        st.session_state, _load_config(), ".", "examples/devseed-oss/golden.yml"
+    )
     sidebar.render(st.session_state)
 
     pages = st.navigation([
