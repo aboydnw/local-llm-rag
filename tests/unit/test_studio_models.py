@@ -36,3 +36,23 @@ def test_installed_models_reads_names_from_client():
         )
     )
     assert models.installed_models(client) == ["qwen2.5:3b", "nomic-embed-text:latest"]
+
+
+def test_pull_progress_normalizes_fractions():
+    chunks = [
+        SimpleNamespace(status="pulling manifest", completed=None, total=None),
+        SimpleNamespace(status="downloading", completed=50, total=100),
+        SimpleNamespace(status="downloading", completed=100, total=100),
+    ]
+    client = SimpleNamespace(pull=lambda model, stream: iter(chunks))
+    events = list(models.pull_progress("qwen2.5:3b", client))
+    assert events[0] == PullEvent("pulling manifest", None)
+    assert events[1] == PullEvent("downloading", 0.5)
+    assert events[2] == PullEvent("downloading", 1.0)
+
+
+def test_pull_progress_handles_zero_total():
+    chunks = [SimpleNamespace(status="verifying", completed=0, total=0)]
+    client = SimpleNamespace(pull=lambda model, stream: iter(chunks))
+    events = list(models.pull_progress("x", client))
+    assert events[0] == PullEvent("verifying", None)
