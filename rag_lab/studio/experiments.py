@@ -98,6 +98,7 @@ def run_eval(
                 "name": name or run_id,
                 "created_at": created_at,
                 "corpus": corpus.label,
+                "corpus_snapshot": corpus.to_dict(),
                 "scores": scores,
                 "config": config.model_dump(),
             },

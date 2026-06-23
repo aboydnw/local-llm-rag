@@ -61,10 +61,19 @@ def loader_for_corpus(workspace: Workspace, corpus: Corpus) -> CombinedLoader:
     loaders = []
     for source in corpus.sources:
         if source.type == "github":
-            clone_into = workspace.clone_dir((source.repo or "").replace("/", "__"))
-            loaders.append(GitHubLoader(source.repo or "", clone_into))
+            if not source.repo:
+                raise ValueError("GitHub source is missing 'repo'")
+            clone_into = workspace.clone_dir(source.repo.replace("/", "__"))
+            loaders.append(GitHubLoader(source.repo, clone_into))
+        elif source.type == "local":
+            if not source.path:
+                raise ValueError("Local source is missing 'path'")
+            path = Path(source.path)
+            if not path.is_dir():
+                raise ValueError(f"Local source directory not found: {source.path}")
+            loaders.append(MarkdownLoader(path))
         else:
-            loaders.append(MarkdownLoader(Path(source.path or "")))
+            raise ValueError(f"unsupported source type: {source.type!r}")
     return CombinedLoader(loaders)
 
 

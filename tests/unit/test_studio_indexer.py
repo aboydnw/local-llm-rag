@@ -1,5 +1,6 @@
 from rag_lab.config import Config
 from rag_lab.embedders.fake import FakeEmbedder
+from rag_lab.loaders.github import GitHubLoader
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import indexer
@@ -136,3 +137,7 @@ def test_loader_for_corpus_builds_one_loader_per_source(tmp_path):
     )
     loader = indexer.loader_for_corpus(ws, c)
     assert len(loader.loaders) == 2
+    assert isinstance(loader.loaders[0], MarkdownLoader)
+    assert loader.loaders[0].root == corpus_dir
+    assert isinstance(loader.loaders[1], GitHubLoader)
+    assert loader.loaders[1].repo == "https://github.com/owner/name.git"

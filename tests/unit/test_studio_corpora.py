@@ -16,6 +16,16 @@ def test_corpus_roundtrips_through_dict():
     assert Corpus.from_dict(c.to_dict()) == c
 
 
+def test_to_dict_rejects_unknown_source_type():
+    with pytest.raises(ValueError):
+        Source(type="web", path="https://example.com").to_dict()
+
+
+def test_from_dict_rejects_unknown_source_type():
+    with pytest.raises(ValueError):
+        Source.from_dict({"type": "web", "url": "https://example.com"})
+
+
 def test_local_corpus_has_single_local_source():
     c = corpora.local_corpus("docs")
     assert c.name == "__local__"

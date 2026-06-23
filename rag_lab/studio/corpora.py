@@ -19,13 +19,17 @@ class Source:
     def to_dict(self) -> dict[str, str]:
         if self.type == "github":
             return {"type": "github", "repo": self.repo or ""}
-        return {"type": "local", "path": self.path or ""}
+        if self.type == "local":
+            return {"type": "local", "path": self.path or ""}
+        raise ValueError(f"unsupported source type: {self.type!r}")
 
     @classmethod
     def from_dict(cls, data: dict[str, str]) -> "Source":
         if data["type"] == "github":
             return cls(type="github", repo=data["repo"])
-        return cls(type="local", path=data["path"])
+        if data["type"] == "local":
+            return cls(type="local", path=data["path"])
+        raise ValueError(f"unsupported source type: {data['type']!r}")
 
 
 @dataclass(frozen=True)

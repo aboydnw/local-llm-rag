@@ -58,6 +58,14 @@ def test_run_eval_persists_run(tmp_path):
     assert (ws.run_dir("r1") / "config.yml").exists()
 
 
+def test_run_eval_snapshots_corpus_sources(tmp_path):
+    import json
+
+    ws, _ = _run(tmp_path, "r1")
+    data = json.loads((ws.run_dir("r1") / "run.json").read_text())
+    assert data["corpus_snapshot"]["sources"][0]["type"] == "local"
+
+
 def test_list_and_load_runs(tmp_path):
     ws, _ = _run(tmp_path, "r1")
     runs = experiments.list_runs(ws)
