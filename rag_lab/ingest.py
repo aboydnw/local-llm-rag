@@ -1,5 +1,6 @@
 from rag_lab.chunkers.base import Chunker
 from rag_lab.embedders.base import Embedder
+from rag_lab.filters import is_api_stub
 from rag_lab.loaders.base import Loader
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.types import Chunk
@@ -17,6 +18,8 @@ def run(
     total = 0
     for document in loader.load():
         for chunk in chunker.chunk(document):
+            if is_api_stub(chunk.text):
+                continue
             batch.append(chunk)
             if len(batch) >= batch_size:
                 total += _flush(batch, embedder, store)

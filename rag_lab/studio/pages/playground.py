@@ -5,6 +5,7 @@ from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio import share as share_mod
 from rag_lab.studio.workspace import Workspace
 
 
@@ -46,3 +47,7 @@ def render() -> None:
         heading = " > ".join(r.chunk.heading_path) or "(no heading)"
         with st.expander(f"[{i}] {r.chunk.doc_path} — {heading}  (score {r.score:.3f})"):
             st.text(r.chunk.text[:1000])
+
+    st.divider()
+    with st.expander("📋 Copy as markdown"):
+        st.code(share_mod.format_run_markdown(question, answer, results), language="markdown")
