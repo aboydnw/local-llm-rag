@@ -5,6 +5,7 @@ import streamlit as st
 from rag_lab import config as config_mod
 from rag_lab.config import Config
 from rag_lab.studio import sidebar, ui_state
+from rag_lab.studio.pages import corpora as corpora_page
 from rag_lab.studio.pages import evaluate, golden, playground, runs
 
 
@@ -27,6 +28,7 @@ def main() -> None:
     pages = st.navigation([
         st.Page(playground.render, title="Ask playground", icon="💬",
                 url_path="playground", default=True),
+        st.Page(corpora_page.render, title="Corpus", icon="📚", url_path="corpus"),
         st.Page(evaluate.render, title="Evaluate", icon="📊", url_path="evaluate"),
         st.Page(runs.render, title="Runs", icon="🏆", url_path="runs"),
         st.Page(golden.render, title="Golden set", icon="✏️", url_path="golden"),
