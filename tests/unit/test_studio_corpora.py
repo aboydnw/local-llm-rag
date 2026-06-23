@@ -65,3 +65,39 @@ def test_validate_name_accepts_simple_name():
 @pytest.mark.parametrize("bad", ["", "  ", "a/b", "..", "__local__"])
 def test_validate_name_rejects_bad(bad):
     assert corpora.validate_name(bad) is not None
+
+
+def test_add_source_appends():
+    c = Corpus(name="kb", sources=())
+    out = corpora.add_source(c, Source(type="github", repo="o/a"))
+    assert out.sources == (Source(type="github", repo="o/a"),)
+
+
+def test_add_source_is_idempotent():
+    s = Source(type="github", repo="o/a")
+    c = Corpus(name="kb", sources=(s,))
+    assert corpora.add_source(c, s).sources == (s,)
+
+
+def test_remove_source_drops_match():
+    s1 = Source(type="github", repo="o/a")
+    s2 = Source(type="github", repo="o/b")
+    c = Corpus(name="kb", sources=(s1, s2))
+    assert corpora.remove_source(c, s1).sources == (s2,)
+
+
+def test_resolve_active_corpus_loads_named(tmp_path):
+    ws = _ws(tmp_path)
+    saved = Corpus(name="kb", sources=(Source(type="github", repo="o/a"),))
+    corpora.save_corpus(ws, saved)
+    assert corpora.resolve_active_corpus(ws, "kb", "docs") == saved
+
+
+def test_resolve_active_corpus_falls_back_to_local(tmp_path):
+    ws = _ws(tmp_path)
+    assert corpora.resolve_active_corpus(ws, None, "docs") == corpora.local_corpus("docs")
+
+
+def test_resolve_active_corpus_falls_back_when_missing(tmp_path):
+    ws = _ws(tmp_path)
+    assert corpora.resolve_active_corpus(ws, "gone", "docs") == corpora.local_corpus("docs")

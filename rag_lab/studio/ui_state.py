@@ -14,4 +14,5 @@ def init_state(session, config: Config, corpus: str, golden: str) -> None:
     """Seed session-state keys for config, corpus, and golden set if absent."""
     session.setdefault("config", config)
     session.setdefault("corpus", corpus)
+    session.setdefault("corpus_name", None)
     session.setdefault("golden", golden)

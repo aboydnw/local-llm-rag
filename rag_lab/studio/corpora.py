@@ -99,3 +99,25 @@ def save_corpus(ws: Workspace, corpus: Corpus) -> None:
 def delete_corpus(ws: Workspace, name: str) -> None:
     """Remove a saved corpus definition; no-op if absent."""
     ws.corpus_file(name).unlink(missing_ok=True)
+
+
+def add_source(corpus: Corpus, source: Source) -> Corpus:
+    """Return a copy of ``corpus`` with ``source`` appended if not already present."""
+    if source in corpus.sources:
+        return corpus
+    return Corpus(name=corpus.name, sources=corpus.sources + (source,))
+
+
+def remove_source(corpus: Corpus, source: Source) -> Corpus:
+    """Return a copy of ``corpus`` without ``source``."""
+    return Corpus(
+        name=corpus.name,
+        sources=tuple(s for s in corpus.sources if s != source),
+    )
+
+
+def resolve_active_corpus(ws: Workspace, corpus_name: str | None, local_path: str) -> Corpus:
+    """Return the named corpus if selected and present, else the local-folder fallback."""
+    if corpus_name and ws.corpus_file(corpus_name).exists():
+        return load_corpus(ws, corpus_name)
+    return local_corpus(local_path)
