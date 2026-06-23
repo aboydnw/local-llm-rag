@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import typer
@@ -205,10 +204,6 @@ def eval(  # noqa: A001
     previous: Path | None = typer.Option(
         None, "--previous", help="Previous report to diff against."
     ),
-    judge: bool = typer.Option(
-        False, "--judge", help="Enable Anthropic LLM judge (requires ANTHROPIC_API_KEY)."
-    ),
-    judge_model: str = typer.Option("claude-sonnet-4-6", "--judge-model"),
 ) -> None:
     """Run the eval harness against a golden set and write a markdown report."""
     if not golden.exists():
@@ -219,9 +214,6 @@ def eval(  # noqa: A001
         raise typer.Exit(code=1)
     if not db.exists():
         typer.echo(f"Index not found: {db}. Run `rag-lab ingest` first.", err=True)
-        raise typer.Exit(code=1)
-    if judge and "ANTHROPIC_API_KEY" not in os.environ:
-        typer.echo("--judge requires ANTHROPIC_API_KEY in the environment.", err=True)
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
@@ -241,19 +233,13 @@ def eval(  # noqa: A001
     )
     llm = OllamaLLM(model=cfg.llm.model)
 
-    judge_scorer = None
-    if judge:
-        from rag_lab.eval.scorers.llm_judge import LLMJudge
-
-        judge_scorer = LLMJudge(model=judge_model)
     scorer = None
     if cfg.eval.deepeval:
         from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
 
         scorer = DeepEvalScorer(model=cfg.llm.model)
     runner = EvalRunner(
-        retriever=retriever, llm=llm, k=cfg.retriever.k,
-        judge=judge_scorer, deepeval_scorer=scorer,
+        retriever=retriever, llm=llm, k=cfg.retriever.k, deepeval_scorer=scorer,
     )
 
     items = golden_set_mod.load_golden_set(golden)

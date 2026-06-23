@@ -1,4 +1,3 @@
-import os
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,37 +20,11 @@ def render() -> None:
         st.info(f"DeepEval scoring: enabled ({cfg.llm.model})")
     else:
         st.info("DeepEval scoring: disabled — set `eval.deepeval: true` in rag.yml to enable.")
-    has_key = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
-    judge_on = st.toggle(
-        "Use LLM judge", value=False,
-        help="Grade each answer 1-5 against the golden ideal answer. Adds an LLM call "
-        "per question, so it's slower than the retrieval metrics.",
-    )
-    local_label = f"Local — Ollama ({cfg.llm.model})"
-    anthropic_label = "Anthropic — claude-sonnet-4-6"
-    judge_choice = local_label
-    if judge_on:
-        options = [local_label] + ([anthropic_label] if has_key else [])
-        judge_choice = st.radio(
-            "Judge model", options,
-            help="Local runs fully offline via Ollama. Anthropic needs ANTHROPIC_API_KEY.",
-        )
-        if not has_key:
-            st.caption("Set ANTHROPIC_API_KEY to also enable the Anthropic judge.")
 
     if st.button("Run eval", type="primary"):
         if not golden.exists():
             st.error(f"Golden set not found: {golden}")
             return
-        judge = None
-        if judge_on:
-            if judge_choice == anthropic_label:
-                from rag_lab.eval.scorers.llm_judge import LLMJudge
-                judge = LLMJudge(model="claude-sonnet-4-6")
-            else:
-                from rag_lab.eval.scorers.llm_judge import OllamaJudge
-                from rag_lab.studio import components
-                judge = OllamaJudge(components.build_llm(cfg))
         ws = Workspace.default()
         ws.initialize()
         with st.spinner("Running eval (this builds the index if needed)..."):
@@ -61,7 +34,6 @@ def render() -> None:
                     run_id=uuid.uuid4().hex[:8],
                     created_at=datetime.now(UTC).isoformat(timespec="seconds"),
                     name=name or None,
-                    judge=judge,
                 )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Eval failed: {exc}")

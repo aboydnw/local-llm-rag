@@ -54,7 +54,6 @@ def run_eval(
     created_at: str,
     *,
     name: str | None = None,
-    judge=None,
     loader=None,
     embedder=None,
     llm=None,
@@ -74,8 +73,7 @@ def run_eval(
 
         scorer = DeepEvalScorer(model=config.llm.model)
     runner = EvalRunner(
-        retriever=retriever, llm=llm, k=config.retriever.k,
-        judge=judge, deepeval_scorer=scorer,
+        retriever=retriever, llm=llm, k=config.retriever.k, deepeval_scorer=scorer
     )
 
     items = golden_set_mod.load_golden_set(golden_path)

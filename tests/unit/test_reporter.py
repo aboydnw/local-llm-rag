@@ -12,8 +12,6 @@ def _make_result(item_id, recall, mrr_, kw, deepeval_scores=None) -> EvalResult:
         recall_at_k=recall,
         mrr=mrr_,
         keyword_coverage=kw,
-        judge_score=None,
-        judge_reason=None,
         deepeval_scores=deepeval_scores or {},
     )
 
