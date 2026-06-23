@@ -50,6 +50,19 @@ def test_embedding_dimension_unknown_model_raises():
         config_mod.embedding_dimension("does-not-exist")
 
 
+def test_eval_config_defaults_to_disabled():
+    from rag_lab.config import EvalConfig
+    assert EvalConfig().deepeval is False
+    assert Config().eval.deepeval is False
+
+
+def test_load_config_parses_eval_section(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "rag.yml"
+    cfg_path.write_text("eval:\n  deepeval: true\n")
+    cfg = load_config(cfg_path)
+    assert cfg.eval.deepeval is True
+
+
 def test_config_summary_mentions_key_knobs():
     summary = config_mod.config_summary(Config())
     assert "markdown_aware" in summary

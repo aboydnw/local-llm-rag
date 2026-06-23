@@ -1,4 +1,5 @@
 import json
+import math
 import statistics
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,9 +34,14 @@ def _aggregate_scores(results) -> dict[str, float]:
         "mrr": statistics.mean(r.mrr for r in results),
         "keyword_coverage": statistics.mean(r.keyword_coverage for r in results),
     }
-    judged = [r.judge_score for r in results if r.judge_score is not None]
-    if judged:
-        scores["judge_score"] = statistics.mean(judged)
+    for key in sorted({k for r in results for k in r.deepeval_scores}):
+        vals = [
+            r.deepeval_scores[key]
+            for r in results
+            if key in r.deepeval_scores and not math.isnan(r.deepeval_scores[key])
+        ]
+        if vals:
+            scores[key] = statistics.mean(vals)
     return scores
 
 
@@ -48,7 +54,6 @@ def run_eval(
     created_at: str,
     *,
     name: str | None = None,
-    judge=None,
     loader=None,
     embedder=None,
     llm=None,
@@ -62,8 +67,13 @@ def run_eval(
     retriever = components.build_retriever(store, embedder, config)
     if llm is None:
         llm = components.build_llm(config)
+    scorer = None
+    if config.eval.deepeval:
+        from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
+
+        scorer = DeepEvalScorer(model=config.llm.model)
     runner = EvalRunner(
-        retriever=retriever, llm=llm, k=config.retriever.k, judge=judge
+        retriever=retriever, llm=llm, k=config.retriever.k, deepeval_scorer=scorer
     )
 
     items = golden_set_mod.load_golden_set(golden_path)

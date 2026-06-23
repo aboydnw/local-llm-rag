@@ -61,31 +61,35 @@ def test_runner_scores_each_golden_item() -> None:
     assert isinstance(hit.actual_answer, str)
 
 
-def test_runner_passes_judge_score_when_judge_provided() -> None:
-    class _StubJudge:
-        def score(self, question: str, actual_answer: str, ideal_answer: str):
-            from rag_lab.eval.scorers.llm_judge import JudgeResult
-            return JudgeResult(score=4, reason="good")
+def test_runner_rejects_non_positive_k() -> None:
+    with pytest.raises(ValueError):
+        EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=0)
+
+
+def test_runner_populates_deepeval_scores_with_chunk_texts():
+    captured = {}
+
+    class _StubScorer:
+        def score(self, question, answer, retrieval_context, ideal_answer=""):
+            captured["retrieval_context"] = retrieval_context
+            captured["ideal_answer"] = ideal_answer
+            return {"answer_relevancy": 0.9, "faithfulness": 0.8}
 
     items = [GoldenItem(id="x", question="q", ideal_docs=[], must_mention=[], ideal_answer="i")]
     runner = EvalRunner(
         retriever=_StubRetriever(["a.md"]),
         llm=_StubLLM(),
         k=3,
-        judge=_StubJudge(),
+        deepeval_scorer=_StubScorer(),
     )
     results = runner.run(items)
-    assert results[0].judge_score == 4
-    assert results[0].judge_reason == "good"
+    assert results[0].deepeval_scores == {"answer_relevancy": 0.9, "faithfulness": 0.8}
+    assert captured["retrieval_context"] == ["x"]
+    assert captured["ideal_answer"] == "i"
 
 
-def test_runner_rejects_non_positive_k() -> None:
-    with pytest.raises(ValueError):
-        EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=0)
-
-
-def test_runner_no_judge_leaves_judge_fields_none() -> None:
+def test_runner_without_deepeval_scorer_leaves_scores_empty():
     items = [GoldenItem(id="x", question="q", ideal_docs=[], must_mention=[], ideal_answer="i")]
     runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=3)
     results = runner.run(items)
-    assert results[0].judge_score is None
+    assert results[0].deepeval_scores == {}

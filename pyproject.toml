@@ -24,11 +24,11 @@ dev = [
     "pytest-cov>=5",
     "ruff>=0.5",
 ]
-judge = [
-    "anthropic>=0.40",
-]
 studio = [
     "streamlit>=1.36",
+]
+deepeval = [
+    "deepeval>=2.0",
 ]
 
 [project.scripts]

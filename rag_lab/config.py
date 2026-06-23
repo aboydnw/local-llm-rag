@@ -28,11 +28,16 @@ class RetrieverConfig(BaseModel):
     k: int = Field(default=5, gt=0)
 
 
+class EvalConfig(BaseModel):
+    deepeval: bool = False
+
+
 class Config(BaseModel):
     chunker: ChunkerConfig = ChunkerConfig()
     embedder: EmbedderConfig = EmbedderConfig()
     llm: LLMConfig = LLMConfig()
     retriever: RetrieverConfig = RetrieverConfig()
+    eval: EvalConfig = EvalConfig()
 
 
 EMBEDDING_DIMENSIONS: dict[str, int] = {
@@ -76,6 +81,8 @@ retriever:
   bm25_weight: 0.5
   vector_weight: 0.5
   k: 5
+eval:
+  deepeval: false
 """
 
 
