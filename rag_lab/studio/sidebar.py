@@ -36,12 +36,24 @@ def render(session) -> Config:
         installed = []
         ollama_error = str(exc)
     st.sidebar.header("Corpus")
-    session["corpus"] = st.sidebar.text_input(
-        "Corpus directory",
-        value=session["corpus"],
-        help="Folder of markdown (.md) files you want to ask questions about. "
-        "Searched recursively. Defaults to the current directory.",
-    ).strip()
+    corpus_names = corpora_mod.list_corpora(Workspace.default())
+    options = ["(local folder)"] + corpus_names
+    current = session.get("corpus_name") or "(local folder)"
+    choice = st.sidebar.selectbox(
+        "Active corpus", options,
+        index=options.index(current) if current in options else 0,
+        help="Pick a curated corpus, or use a local folder. "
+        "Manage corpora on the Corpus page.",
+    )
+    if choice == "(local folder)":
+        session["corpus_name"] = None
+        session["corpus"] = st.sidebar.text_input(
+            "Corpus directory",
+            value=session["corpus"],
+            help="Folder of markdown (.md) files. Searched recursively.",
+        ).strip()
+    else:
+        session["corpus_name"] = choice
     session["golden"] = st.sidebar.text_input(
         "Golden set",
         value=session["golden"],
@@ -128,11 +140,15 @@ def render(session) -> Config:
     ws = Workspace.default()
     ws.initialize()
     st.sidebar.divider()
-    corpus_error = indexer_mod.validate_corpus(session["corpus"])
+    active = corpora_mod.resolve_active_corpus(ws, session.get("corpus_name"), session["corpus"])
+    if session.get("corpus_name") is None:
+        corpus_error = indexer_mod.validate_corpus(session["corpus"])
+    else:
+        corpus_error = None
     if corpus_error is not None:
         st.sidebar.error(corpus_error)
     else:
-        status = indexer_mod.status(ws, corpora_mod.local_corpus(session["corpus"]), cfg)
+        status = indexer_mod.status(ws, active, cfg)
         if status.cached:
             st.sidebar.success("Index: ✓ cached")
         else:
@@ -145,7 +161,7 @@ def render(session) -> Config:
     if col2.button("Build index", disabled=corpus_error is not None):
         try:
             with st.spinner("Building index..."):
-                indexer_mod.ensure_index(ws, corpora_mod.local_corpus(session["corpus"]), cfg)
+                indexer_mod.ensure_index(ws, active, cfg)
             st.sidebar.toast("Index built")
         except ValueError as exc:
             st.sidebar.error(str(exc))
