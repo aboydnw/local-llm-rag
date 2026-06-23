@@ -25,6 +25,15 @@ def test_admonition_with_content_is_not_stub():
     assert is_api_stub(":::note\nThis is an important note about tiles.") is False
 
 
+def test_spaced_admonition_directive_is_not_stub():
+    assert is_api_stub("::: note") is False
+    assert is_api_stub(":::note") is False
+
+
+def test_admonition_with_indented_content_is_not_stub():
+    assert is_api_stub("::: note\n    Indented note body.") is False
+
+
 def test_empty_text_is_not_stub():
     assert is_api_stub("") is False
     assert is_api_stub("   \n  ") is False
