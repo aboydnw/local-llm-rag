@@ -26,6 +26,20 @@ def test_path_helpers(tmp_path):
     assert ws.run_dir("r1").parent == ws.runs_dir
 
 
+def test_initialize_creates_corpora_and_clones_dirs(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    assert ws.corpora_dir.is_dir()
+    assert ws.clones_dir.is_dir()
+
+
+def test_corpus_and_clone_path_helpers(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    assert ws.corpus_file("titiler-stack").name == "titiler-stack.json"
+    assert ws.corpus_file("titiler-stack").parent == ws.corpora_dir
+    assert ws.clone_dir("owner__name").parent == ws.clones_dir
+
+
 @pytest.mark.parametrize("bad", ["..", "../escape", "a/b", "/etc/passwd", ""])
 def test_path_helpers_reject_traversal(tmp_path, bad):
     ws = Workspace(tmp_path / ".rag-lab")
@@ -33,3 +47,7 @@ def test_path_helpers_reject_traversal(tmp_path, bad):
         ws.run_dir(bad)
     with pytest.raises(ValueError):
         ws.index_db(bad)
+    with pytest.raises(ValueError):
+        ws.corpus_file(bad)
+    with pytest.raises(ValueError):
+        ws.clone_dir(bad)
