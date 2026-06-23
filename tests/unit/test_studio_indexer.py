@@ -3,6 +3,7 @@ from rag_lab.embedders.fake import FakeEmbedder
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import indexer
+from rag_lab.studio.corpora import Corpus, Source, local_corpus
 from rag_lab.studio.workspace import Workspace
 
 
@@ -46,60 +47,92 @@ def test_validate_corpus_rejects_dir_without_markdown(tmp_path):
     assert msg is not None and "No markdown (.md) files found in:" in msg
 
 
-def test_cache_key_stable_for_same_config():
+def test_cache_key_stable_for_same_corpus():
     cfg = Config()
-    assert indexer.cache_key("corpus", cfg) == indexer.cache_key("corpus", cfg)
+    c = Corpus(name="kb", sources=(Source(type="github", repo="o/a"),))
+    assert indexer.cache_key(c, cfg) == indexer.cache_key(c, cfg)
+
+
+def test_cache_key_ignores_source_order():
+    cfg = Config()
+    s1 = Source(type="github", repo="o/a")
+    s2 = Source(type="github", repo="o/b")
+    assert indexer.cache_key(Corpus("kb", (s1, s2)), cfg) == indexer.cache_key(
+        Corpus("kb", (s2, s1)), cfg
+    )
+
+
+def test_cache_key_changes_with_sources():
+    cfg = Config()
+    a = Corpus("kb", (Source(type="github", repo="o/a"),))
+    b = Corpus("kb", (Source(type="github", repo="o/b"),))
+    assert indexer.cache_key(a, cfg) != indexer.cache_key(b, cfg)
 
 
 def test_cache_key_changes_with_chunker():
-    a = Config()
-    b = Config()
+    a, b = Config(), Config()
     b.chunker.max_tokens = 256
-    assert indexer.cache_key("corpus", a) != indexer.cache_key("corpus", b)
+    c = local_corpus("corpus")
+    assert indexer.cache_key(c, a) != indexer.cache_key(c, b)
 
 
 def test_cache_key_changes_with_embedder():
-    a = Config()
-    b = Config()
+    a, b = Config(), Config()
     b.embedder.model = "mxbai-embed-large"
-    assert indexer.cache_key("corpus", a) != indexer.cache_key("corpus", b)
+    c = local_corpus("corpus")
+    assert indexer.cache_key(c, a) != indexer.cache_key(c, b)
 
 
 def test_cache_key_ignores_retriever_and_llm():
-    a = Config()
-    b = Config()
+    a, b = Config(), Config()
     b.retriever.k = 99
     b.retriever.type = "bm25"
     b.llm.model = "something-else"
-    assert indexer.cache_key("corpus", a) == indexer.cache_key("corpus", b)
+    c = local_corpus("corpus")
+    assert indexer.cache_key(c, a) == indexer.cache_key(c, b)
 
 
 def test_build_index_creates_populated_db(tmp_path):
     ws = Workspace(tmp_path / ".rag-lab")
     ws.initialize()
-    corpus = _corpus(tmp_path)
+    corpus_dir = _corpus(tmp_path)
+    c = local_corpus(str(corpus_dir))
     db = indexer.build_index(
-        ws, str(corpus), Config(),
-        loader=MarkdownLoader(corpus), embedder=FakeEmbedder(16),
+        ws, c, Config(),
+        loader=MarkdownLoader(corpus_dir), embedder=FakeEmbedder(16),
     )
     assert db.exists()
     assert SqliteVecStore(db, dimension=16).count() > 0
-    key = indexer.cache_key(str(corpus), Config())
-    assert ws.index_meta(key).exists()
+    assert ws.index_meta(indexer.cache_key(c, Config())).exists()
 
 
 def test_ensure_index_reuses_cache(tmp_path, monkeypatch):
     ws = Workspace(tmp_path / ".rag-lab")
     ws.initialize()
-    corpus = _corpus(tmp_path)
+    corpus_dir = _corpus(tmp_path)
+    c = local_corpus(str(corpus_dir))
     indexer.build_index(
-        ws, str(corpus), Config(),
-        loader=MarkdownLoader(corpus), embedder=FakeEmbedder(16),
+        ws, c, Config(),
+        loader=MarkdownLoader(corpus_dir), embedder=FakeEmbedder(16),
     )
 
     def _boom(*args, **kwargs):
         raise AssertionError("should not rebuild a cached index")
 
     monkeypatch.setattr(indexer, "build_index", _boom)
-    db = indexer.ensure_index(ws, str(corpus), Config())
-    assert db.exists()
+    assert indexer.ensure_index(ws, c, Config()).exists()
+
+
+def test_loader_for_corpus_builds_one_loader_per_source(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    corpus_dir = _corpus(tmp_path)
+    c = Corpus(
+        name="kb",
+        sources=(
+            Source(type="local", path=str(corpus_dir)),
+            Source(type="github", repo="owner/name"),
+        ),
+    )
+    loader = indexer.loader_for_corpus(ws, c)
+    assert len(loader.loaders) == 2
