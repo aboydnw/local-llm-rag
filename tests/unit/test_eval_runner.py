@@ -89,3 +89,30 @@ def test_runner_no_judge_leaves_judge_fields_none() -> None:
     runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=3)
     results = runner.run(items)
     assert results[0].judge_score is None
+
+
+def test_runner_populates_deepeval_scores_with_chunk_texts():
+    captured = {}
+
+    class _StubScorer:
+        def score(self, question, answer, retrieval_context, ideal_answer=""):
+            captured["retrieval_context"] = retrieval_context
+            return {"answer_relevancy": 0.9, "faithfulness": 0.8}
+
+    items = [GoldenItem(id="x", question="q", ideal_docs=[], must_mention=[], ideal_answer="i")]
+    runner = EvalRunner(
+        retriever=_StubRetriever(["a.md"]),
+        llm=_StubLLM(),
+        k=3,
+        deepeval_scorer=_StubScorer(),
+    )
+    results = runner.run(items)
+    assert results[0].deepeval_scores == {"answer_relevancy": 0.9, "faithfulness": 0.8}
+    assert captured["retrieval_context"] == ["x"]
+
+
+def test_runner_without_deepeval_scorer_leaves_scores_empty():
+    items = [GoldenItem(id="x", question="q", ideal_docs=[], must_mention=[], ideal_answer="i")]
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=3)
+    results = runner.run(items)
+    assert results[0].deepeval_scores == {}

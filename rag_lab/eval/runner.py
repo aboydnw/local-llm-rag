@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from rag_lab.eval.golden_set import GoldenItem
@@ -23,6 +23,7 @@ class EvalResult:
     keyword_coverage: float
     judge_score: int | None
     judge_reason: str | None
+    deepeval_scores: dict[str, float] = field(default_factory=dict)
 
 
 class EvalRunner:
@@ -33,6 +34,7 @@ class EvalRunner:
         k: int,
         prompt_builder: PromptBuilder | None = None,
         judge: Judge | None = None,
+        deepeval_scorer=None,
     ) -> None:
         if k <= 0:
             raise ValueError("k must be positive")
@@ -41,6 +43,7 @@ class EvalRunner:
         self.k = k
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.judge = judge
+        self.deepeval_scorer = deepeval_scorer
 
     def run(self, items: list[GoldenItem]) -> list[EvalResult]:
         out: list[EvalResult] = []
@@ -60,6 +63,15 @@ class EvalRunner:
                 judge_score = jr.score
                 judge_reason = jr.reason
 
+            deepeval_scores: dict[str, float] = {}
+            if self.deepeval_scorer is not None:
+                deepeval_scores = self.deepeval_scorer.score(
+                    question=item.question,
+                    answer=answer,
+                    retrieval_context=[r.chunk.text for r in results],
+                    ideal_answer=item.ideal_answer,
+                )
+
             out.append(
                 EvalResult(
                     item_id=item.id,
@@ -70,6 +82,7 @@ class EvalRunner:
                     keyword_coverage=keyword_coverage(answer, item.must_mention),
                     judge_score=judge_score,
                     judge_reason=judge_reason,
+                    deepeval_scores=deepeval_scores,
                 )
             )
         return out
