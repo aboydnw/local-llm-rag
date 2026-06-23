@@ -4,6 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import experiments
 from rag_lab.studio.workspace import Workspace
 
@@ -12,7 +13,7 @@ def render() -> None:
     """Render the Evaluate page: run the golden set and show aggregates + report."""
     st.title("Evaluate")
     cfg = st.session_state["config"]
-    corpus = st.session_state["corpus"]
+    corpus = corpora_mod.local_corpus(st.session_state["corpus"])
     golden = Path(st.session_state["golden"])
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")

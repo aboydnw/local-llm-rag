@@ -4,6 +4,7 @@ import streamlit as st
 import yaml
 
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config, config_summary
+from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio import models as models_mod
 from rag_lab.studio import ui_state
@@ -131,7 +132,7 @@ def render(session) -> Config:
     if corpus_error is not None:
         st.sidebar.error(corpus_error)
     else:
-        status = indexer_mod.status(ws, session["corpus"], cfg)
+        status = indexer_mod.status(ws, corpora_mod.local_corpus(session["corpus"]), cfg)
         if status.cached:
             st.sidebar.success("Index: ✓ cached")
         else:
@@ -144,7 +145,7 @@ def render(session) -> Config:
     if col2.button("Build index", disabled=corpus_error is not None):
         try:
             with st.spinner("Building index..."):
-                indexer_mod.ensure_index(ws, session["corpus"], cfg)
+                indexer_mod.ensure_index(ws, corpora_mod.local_corpus(session["corpus"]), cfg)
             st.sidebar.toast("Index built")
         except ValueError as exc:
             st.sidebar.error(str(exc))

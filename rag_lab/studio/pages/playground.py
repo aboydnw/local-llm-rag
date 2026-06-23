@@ -3,6 +3,7 @@ import streamlit as st
 from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
+from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.workspace import Workspace
 
@@ -11,7 +12,7 @@ def render() -> None:
     """Render the Ask playground: retrieve chunks and generate an answer for a question."""
     st.title("Ask playground")
     cfg = st.session_state["config"]
-    corpus = st.session_state["corpus"]
+    corpus = corpora_mod.local_corpus(st.session_state["corpus"])
     question = st.text_input("Question", placeholder="What is titiler?")
 
     ws = Workspace.default()

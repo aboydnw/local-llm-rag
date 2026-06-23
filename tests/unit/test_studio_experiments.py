@@ -4,6 +4,7 @@ from rag_lab.config import Config
 from rag_lab.embedders.fake import FakeEmbedder
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.studio import experiments
+from rag_lab.studio.corpora import local_corpus
 from rag_lab.studio.workspace import Workspace
 
 
@@ -37,7 +38,7 @@ def _run(tmp_path, run_id, config=None):
     corpus = _corpus(tmp_path)
     return ws, experiments.run_eval(
         ws,
-        str(corpus),
+        local_corpus(str(corpus)),
         config or Config(),
         _golden(tmp_path),
         run_id=run_id,
