@@ -4,6 +4,7 @@ from rag_lab.config import Config
 from rag_lab.embedders.fake import FakeEmbedder
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.studio import experiments
+from rag_lab.studio.corpora import local_corpus
 from rag_lab.studio.workspace import Workspace
 
 
@@ -37,7 +38,7 @@ def _run(tmp_path, run_id, config=None):
     corpus = _corpus(tmp_path)
     return ws, experiments.run_eval(
         ws,
-        str(corpus),
+        local_corpus(str(corpus)),
         config or Config(),
         _golden(tmp_path),
         run_id=run_id,
@@ -55,6 +56,14 @@ def test_run_eval_persists_run(tmp_path):
     assert (ws.run_dir("r1") / "run.json").exists()
     assert (ws.run_dir("r1") / "report.md").exists()
     assert (ws.run_dir("r1") / "config.yml").exists()
+
+
+def test_run_eval_snapshots_corpus_sources(tmp_path):
+    import json
+
+    ws, _ = _run(tmp_path, "r1")
+    data = json.loads((ws.run_dir("r1") / "run.json").read_text())
+    assert data["corpus_snapshot"]["sources"][0]["type"] == "local"
 
 
 def test_list_and_load_runs(tmp_path):

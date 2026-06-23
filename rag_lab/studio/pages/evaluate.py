@@ -4,6 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import experiments
 from rag_lab.studio.workspace import Workspace
 
@@ -12,7 +13,11 @@ def render() -> None:
     """Render the Evaluate page: run the golden set and show aggregates + report."""
     st.title("Evaluate")
     cfg = st.session_state["config"]
-    corpus = st.session_state["corpus"]
+    ws = Workspace.default()
+    ws.initialize()
+    corpus = corpora_mod.resolve_active_corpus(
+        ws, st.session_state.get("corpus_name"), st.session_state["corpus"]
+    )
     golden = Path(st.session_state["golden"])
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
@@ -25,8 +30,6 @@ def render() -> None:
         if not golden.exists():
             st.error(f"Golden set not found: {golden}")
             return
-        ws = Workspace.default()
-        ws.initialize()
         with st.spinner("Running eval (this builds the index if needed)..."):
             try:
                 record = experiments.run_eval(

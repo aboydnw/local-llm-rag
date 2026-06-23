@@ -31,10 +31,20 @@ class Workspace:
     def runs_dir(self) -> Path:
         return self.root / "runs"
 
+    @property
+    def corpora_dir(self) -> Path:
+        return self.root / "corpora"
+
+    @property
+    def clones_dir(self) -> Path:
+        return self.root / "clones"
+
     def initialize(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         self.indexes_dir.mkdir(exist_ok=True)
         self.runs_dir.mkdir(exist_ok=True)
+        self.corpora_dir.mkdir(exist_ok=True)
+        self.clones_dir.mkdir(exist_ok=True)
         gitignore = self.root / ".gitignore"
         if not gitignore.exists():
             gitignore.write_text("*\n")
@@ -47,3 +57,9 @@ class Workspace:
 
     def run_dir(self, run_id: str) -> Path:
         return self.runs_dir / _safe_segment(run_id)
+
+    def corpus_file(self, name: str) -> Path:
+        return self.corpora_dir / f"{_safe_segment(name)}.json"
+
+    def clone_dir(self, key: str) -> Path:
+        return self.clones_dir / _safe_segment(key)

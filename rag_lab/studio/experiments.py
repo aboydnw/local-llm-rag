@@ -13,6 +13,7 @@ from rag_lab.eval.runner import EvalRunner
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio.corpora import Corpus
 from rag_lab.studio.workspace import Workspace
 
 
@@ -47,7 +48,7 @@ def _aggregate_scores(results) -> dict[str, float]:
 
 def run_eval(
     workspace: Workspace,
-    corpus: str,
+    corpus: Corpus,
     config: Config,
     golden_path: Path,
     run_id: str,
@@ -96,7 +97,8 @@ def run_eval(
                 "run_id": run_id,
                 "name": name or run_id,
                 "created_at": created_at,
-                "corpus": corpus,
+                "corpus": corpus.label,
+                "corpus_snapshot": corpus.to_dict(),
                 "scores": scores,
                 "config": config.model_dump(),
             },
@@ -107,7 +109,7 @@ def run_eval(
         run_id=run_id,
         name=name or run_id,
         created_at=created_at,
-        corpus=corpus,
+        corpus=corpus.label,
         scores=scores,
         config=config,
     )

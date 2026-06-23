@@ -24,3 +24,11 @@ def test_init_state_seeds_missing_keys():
     assert "config" in session
     assert session["corpus"] == "corpus"
     assert session["golden"] == "golden.yml"
+
+
+def test_init_state_seeds_corpus_name_none():
+    from rag_lab.config import Config
+
+    session = {}
+    ui_state.init_state(session, Config(), ".", "golden.yml")
+    assert session["corpus_name"] is None

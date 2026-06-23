@@ -3,6 +3,7 @@ import streamlit as st
 from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
+from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.workspace import Workspace
 
@@ -11,10 +12,12 @@ def render() -> None:
     """Render the Ask playground: retrieve chunks and generate an answer for a question."""
     st.title("Ask playground")
     cfg = st.session_state["config"]
-    corpus = st.session_state["corpus"]
     question = st.text_input("Question", placeholder="What is titiler?")
 
     ws = Workspace.default()
+    corpus = corpora_mod.resolve_active_corpus(
+        ws, st.session_state.get("corpus_name"), st.session_state["corpus"]
+    )
     status = indexer_mod.status(ws, corpus, cfg)
     if status.needs_build:
         st.warning("This config has no built index yet. Use **Build index** in the sidebar.")

@@ -6,9 +6,12 @@ from pathlib import Path
 from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.config import Config
+from rag_lab.loaders.combined import CombinedLoader
+from rag_lab.loaders.github import GitHubLoader
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
+from rag_lab.studio.corpora import Corpus
 from rag_lab.studio.workspace import Workspace
 
 
@@ -19,9 +22,13 @@ class IndexStatus:
     needs_build: bool
 
 
-def cache_key(corpus: str, config: Config) -> str:
+def cache_key(corpus: Corpus, config: Config) -> str:
+    sources = sorted(
+        (s.to_dict() for s in corpus.sources),
+        key=lambda d: json.dumps(d, sort_keys=True),
+    )
     payload = {
-        "corpus": corpus,
+        "sources": sources,
         "chunker": config.chunker.model_dump(),
         "embedder": config.embedder.model_dump(),
     }
@@ -29,7 +36,7 @@ def cache_key(corpus: str, config: Config) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
-def status(workspace: Workspace, corpus: str, config: Config) -> IndexStatus:
+def status(workspace: Workspace, corpus: Corpus, config: Config) -> IndexStatus:
     key = cache_key(corpus, config)
     cached = workspace.index_db(key).exists()
     return IndexStatus(cache_key=key, cached=cached, needs_build=not cached)
@@ -50,16 +57,29 @@ def validate_corpus(corpus: str) -> str | None:
     return None
 
 
-def _default_loader(corpus: str) -> MarkdownLoader:
-    reason = validate_corpus(corpus)
-    if reason is not None:
-        raise ValueError(reason)
-    return MarkdownLoader(Path(corpus.strip()))
+def loader_for_corpus(workspace: Workspace, corpus: Corpus) -> CombinedLoader:
+    loaders = []
+    for source in corpus.sources:
+        if source.type == "github":
+            if not source.repo:
+                raise ValueError("GitHub source is missing 'repo'")
+            clone_into = workspace.clone_dir(source.repo.replace("/", "__"))
+            loaders.append(GitHubLoader(source.repo, clone_into))
+        elif source.type == "local":
+            if not source.path:
+                raise ValueError("Local source is missing 'path'")
+            path = Path(source.path)
+            if not path.is_dir():
+                raise ValueError(f"Local source directory not found: {source.path}")
+            loaders.append(MarkdownLoader(path))
+        else:
+            raise ValueError(f"unsupported source type: {source.type!r}")
+    return CombinedLoader(loaders)
 
 
 def build_index(
     workspace: Workspace,
-    corpus: str,
+    corpus: Corpus,
     config: Config,
     *,
     loader=None,
@@ -68,7 +88,7 @@ def build_index(
     if embedder is None:
         embedder = components.build_embedder(config)
     if loader is None:
-        loader = _default_loader(corpus)
+        loader = loader_for_corpus(workspace, corpus)
     chunker = MarkdownAwareChunker(
         max_tokens=config.chunker.max_tokens, overlap=config.chunker.overlap
     )
@@ -79,7 +99,7 @@ def build_index(
     workspace.index_meta(key).write_text(
         json.dumps(
             {
-                "corpus": corpus,
+                "corpus": corpus.to_dict(),
                 "chunker": config.chunker.model_dump(),
                 "embedder": config.embedder.model_dump(),
             },
@@ -91,7 +111,7 @@ def build_index(
 
 def ensure_index(
     workspace: Workspace,
-    corpus: str,
+    corpus: Corpus,
     config: Config,
     *,
     loader=None,
