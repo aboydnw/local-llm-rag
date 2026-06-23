@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 
@@ -6,6 +8,27 @@ def test_module_imports_without_constructing_scorer():
 
     module = importlib.import_module("rag_lab.eval.scorers.deepeval_scorer")
     assert hasattr(module, "DeepEvalScorer")
+
+
+def test_scorer_sets_nan_when_metric_raises(monkeypatch):
+    pytest.importorskip("deepeval")
+    from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric
+
+    from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
+
+    def _boom(self, test_case):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(AnswerRelevancyMetric, "measure", _boom)
+    monkeypatch.setattr(FaithfulnessMetric, "measure", _boom)
+    scorer = DeepEvalScorer(model="llama3.2:3b")
+    scores = scorer.score(
+        question="What is the capital of France?",
+        answer="Paris.",
+        retrieval_context=["The capital of France is Paris."],
+    )
+    assert math.isnan(scores["answer_relevancy"])
+    assert math.isnan(scores["faithfulness"])
 
 
 @pytest.mark.integration

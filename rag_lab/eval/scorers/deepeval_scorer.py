@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from math import nan
+
+logger = logging.getLogger(__name__)
 
 
 class DeepEvalScorer:
@@ -48,6 +51,7 @@ class DeepEvalScorer:
             try:
                 metric.measure(test_case)
                 scores[key] = float(metric.score)
-            except Exception:
+            except Exception as exc:
+                logger.warning("DeepEval metric '%s' failed: %s", key, exc)
                 scores[key] = nan
         return scores

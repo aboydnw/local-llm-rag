@@ -72,6 +72,7 @@ def test_runner_populates_deepeval_scores_with_chunk_texts():
     class _StubScorer:
         def score(self, question, answer, retrieval_context, ideal_answer=""):
             captured["retrieval_context"] = retrieval_context
+            captured["ideal_answer"] = ideal_answer
             return {"answer_relevancy": 0.9, "faithfulness": 0.8}
 
     items = [GoldenItem(id="x", question="q", ideal_docs=[], must_mention=[], ideal_answer="i")]
@@ -84,6 +85,7 @@ def test_runner_populates_deepeval_scores_with_chunk_texts():
     results = runner.run(items)
     assert results[0].deepeval_scores == {"answer_relevancy": 0.9, "faithfulness": 0.8}
     assert captured["retrieval_context"] == ["x"]
+    assert captured["ideal_answer"] == "i"
 
 
 def test_runner_without_deepeval_scorer_leaves_scores_empty():

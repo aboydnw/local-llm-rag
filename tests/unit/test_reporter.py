@@ -76,3 +76,15 @@ def test_report_shows_na_for_missing_deepeval_key(tmp_path: Path) -> None:
     MarkdownReporter().write(results=results, config_summary="cfg", out_path=out)
     content = out.read_text()
     assert "n/a" in content
+
+
+def test_report_skips_nan_deepeval_values_in_display_and_aggregate(tmp_path: Path) -> None:
+    results = [
+        _make_result("a", 1.0, 1.0, 1.0, {"answer_relevancy": float("nan")}),
+        _make_result("b", 1.0, 1.0, 1.0, {"answer_relevancy": 0.6}),
+    ]
+    out = tmp_path / "report.md"
+    MarkdownReporter().write(results=results, config_summary="cfg", out_path=out)
+    content = out.read_text()
+    assert "n/a" in content
+    assert "| answer_relevancy | 0.60 |" in content
