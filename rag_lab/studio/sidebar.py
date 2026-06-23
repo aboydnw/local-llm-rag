@@ -13,9 +13,11 @@ from rag_lab.studio.workspace import Workspace
 def _run_pull(model: str) -> None:
     """Stream a model pull into a sidebar progress bar."""
     bar = st.sidebar.progress(0.0, text=f"Pulling {model}...")
+    fraction = 0.0
     try:
         for event in models_mod.pull_progress(model):
-            fraction = event.fraction if event.fraction is not None else 0.0
+            if event.fraction is not None:
+                fraction = event.fraction
             bar.progress(fraction, text=f"{model}: {event.status}")
         bar.progress(1.0, text=f"{model}: done")
         st.sidebar.toast(f"Pulled {model}")
@@ -82,7 +84,7 @@ def render(session) -> Config:
         "llm model", value=cfg.llm.model,
         help="Ollama model that writes the final answer from retrieved chunks. "
         "Cheap to change — no rebuild needed.",
-    )
+    ).strip()
     if ollama_error is None and not models_mod.is_installed(cfg.llm.model, installed):
         st.sidebar.warning(f"LLM model '{cfg.llm.model}' is not installed.")
         if st.sidebar.button(f"Pull {cfg.llm.model}", key="pull_llm"):
