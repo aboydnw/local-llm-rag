@@ -5,13 +5,35 @@ import yaml
 
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config, config_summary
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio import models as models_mod
 from rag_lab.studio import ui_state
 from rag_lab.studio.workspace import Workspace
+
+
+def _run_pull(model: str) -> None:
+    """Stream a model pull into a sidebar progress bar."""
+    bar = st.sidebar.progress(0.0, text=f"Pulling {model}...")
+    fraction = 0.0
+    try:
+        for event in models_mod.pull_progress(model):
+            if event.fraction is not None:
+                fraction = event.fraction
+            bar.progress(fraction, text=f"{model}: {event.status}")
+        bar.progress(1.0, text=f"{model}: done")
+        st.sidebar.toast(f"Pulled {model}")
+    except Exception as exc:  # noqa: BLE001
+        st.sidebar.error(f"Pull failed: {exc}")
 
 
 def render(session) -> Config:
     """Render the config sidebar and return the current ``Config`` from session state."""
     cfg: Config = session["config"]
+    try:
+        installed = models_mod.installed_models()
+        ollama_error: str | None = None
+    except Exception as exc:  # noqa: BLE001
+        installed = []
+        ollama_error = str(exc)
     st.sidebar.header("Corpus")
     session["corpus"] = st.sidebar.text_input(
         "Corpus directory",
@@ -52,13 +74,21 @@ def render(session) -> Config:
         help="Ollama model that turns text into vectors for semantic search. "
         "Changing it requires a rebuild.",
     )
+    if ollama_error is None and not models_mod.is_installed(cfg.embedder.model, installed):
+        st.sidebar.warning(f"Embedder model '{cfg.embedder.model}' is not installed.")
+        if st.sidebar.button(f"Pull {cfg.embedder.model}", key="pull_embed"):
+            _run_pull(cfg.embedder.model)
 
     st.sidebar.header("LLM  🟢 cheap")
     cfg.llm.model = st.sidebar.text_input(
         "llm model", value=cfg.llm.model,
         help="Ollama model that writes the final answer from retrieved chunks. "
         "Cheap to change — no rebuild needed.",
-    )
+    ).strip()
+    if ollama_error is None and not models_mod.is_installed(cfg.llm.model, installed):
+        st.sidebar.warning(f"LLM model '{cfg.llm.model}' is not installed.")
+        if st.sidebar.button(f"Pull {cfg.llm.model}", key="pull_llm"):
+            _run_pull(cfg.llm.model)
 
     st.sidebar.header("Retriever  🟢 cheap")
     rtypes = ["hybrid", "vector", "bm25"]
@@ -79,6 +109,20 @@ def render(session) -> Config:
         "k", 1, 20, cfg.retriever.k,
         help="How many chunks to retrieve and feed to the LLM for each question.",
     )
+
+    st.sidebar.header("Models")
+    if ollama_error is not None:
+        st.sidebar.info("Ollama not reachable — is it running?")
+    else:
+        st.sidebar.caption("Installed: " + (", ".join(installed) or "none"))
+        pull_name = st.sidebar.text_input(
+            "Pull a model",
+            key="pull_name",
+            help="Name of an Ollama model to download, e.g. llama3.2:3b. "
+            "Runs `ollama pull` and streams progress here.",
+        )
+        if st.sidebar.button("Pull", key="pull_arbitrary") and pull_name.strip():
+            _run_pull(pull_name.strip())
 
     ws = Workspace.default()
     ws.initialize()
