@@ -17,6 +17,10 @@ def render() -> None:
     golden = Path(st.session_state["golden"])
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
+    if cfg.eval.deepeval:
+        st.info(f"DeepEval scoring: enabled ({cfg.llm.model})")
+    else:
+        st.info("DeepEval scoring: disabled — set `eval.deepeval: true` in rag.yml to enable.")
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
     judge_on = st.toggle(
         "Use LLM judge", value=False,

@@ -246,7 +246,15 @@ def eval(  # noqa: A001
         from rag_lab.eval.scorers.llm_judge import LLMJudge
 
         judge_scorer = LLMJudge(model=judge_model)
-    runner = EvalRunner(retriever=retriever, llm=llm, k=cfg.retriever.k, judge=judge_scorer)
+    scorer = None
+    if cfg.eval.deepeval:
+        from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
+
+        scorer = DeepEvalScorer(model=cfg.llm.model)
+    runner = EvalRunner(
+        retriever=retriever, llm=llm, k=cfg.retriever.k,
+        judge=judge_scorer, deepeval_scorer=scorer,
+    )
 
     items = golden_set_mod.load_golden_set(golden)
     typer.echo(f"Running {len(items)} questions...")

@@ -4,16 +4,17 @@ from rag_lab.eval.reporter import MarkdownReporter
 from rag_lab.eval.runner import EvalResult
 
 
-def _make_result(id_: str, recall: float, mrr_: float, kw: float, judge: int | None = None) -> EvalResult:
+def _make_result(item_id, recall, mrr_, kw, deepeval_scores=None) -> EvalResult:
     return EvalResult(
-        item_id=id_,
+        item_id=item_id,
         question="q",
         actual_answer="a",
         recall_at_k=recall,
         mrr=mrr_,
         keyword_coverage=kw,
-        judge_score=judge,
-        judge_reason="r" if judge is not None else None,
+        judge_score=None,
+        judge_reason=None,
+        deepeval_scores=deepeval_scores or {},
     )
 
 
@@ -56,31 +57,24 @@ def test_report_includes_diff_when_previous_report_exists(tmp_path: Path) -> Non
     assert "+0.50" in content or "+0.5" in content
 
 
-def test_report_includes_judge_column_when_judge_results_present(tmp_path: Path) -> None:
-    results = [_make_result("a", 1.0, 1.0, 1.0, judge=5)]
-    out_path = tmp_path / "report.md"
-    MarkdownReporter().write(results=results, config_summary="x", out_path=out_path)
-    content = out_path.read_text()
-    assert "judge" in content.lower()
-    assert "5" in content
-
-
-def test_report_sanitizes_newlines_in_judge_reason(tmp_path: Path) -> None:
-    result = EvalResult(
-        item_id="a",
-        question="q",
-        actual_answer="ans",
-        recall_at_k=1.0,
-        mrr=1.0,
-        keyword_coverage=1.0,
-        judge_score=3,
-        judge_reason="line one\nline two\r\nline three",
-    )
-    out_path = tmp_path / "report.md"
-    MarkdownReporter().write(results=[result], config_summary="x", out_path=out_path)
-    detail_rows = [
-        line for line in out_path.read_text().splitlines() if line.startswith("| a |")
+def test_report_renders_deepeval_aggregate_and_columns(tmp_path: Path) -> None:
+    results = [
+        _make_result("a", 1.0, 1.0, 1.0, {"answer_relevancy": 0.8, "faithfulness": 0.9}),
+        _make_result("b", 0.0, 0.0, 0.0, {"answer_relevancy": 0.6, "faithfulness": 0.5}),
     ]
-    assert len(detail_rows) == 1
-    assert "\n" not in detail_rows[0]
-    assert "line one line two line three" in detail_rows[0]
+    out = tmp_path / "report.md"
+    MarkdownReporter().write(results=results, config_summary="cfg", out_path=out)
+    content = out.read_text()
+    assert "answer_relevancy" in content
+    assert "faithfulness" in content
+
+
+def test_report_shows_na_for_missing_deepeval_key(tmp_path: Path) -> None:
+    results = [
+        _make_result("a", 1.0, 1.0, 1.0, {"answer_relevancy": 0.8, "contextual_precision": 0.7}),
+        _make_result("b", 1.0, 1.0, 1.0, {"answer_relevancy": 0.6}),
+    ]
+    out = tmp_path / "report.md"
+    MarkdownReporter().write(results=results, config_summary="cfg", out_path=out)
+    content = out.read_text()
+    assert "n/a" in content

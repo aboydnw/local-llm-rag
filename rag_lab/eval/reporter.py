@@ -1,3 +1,4 @@
+import math
 import re
 import statistics
 from datetime import UTC, datetime
@@ -61,21 +62,18 @@ class MarkdownReporter:
 
         lines.append("## Per-question detail")
         lines.append("")
-        has_judge = any(r.judge_score is not None for r in results)
-        if has_judge:
-            header = "| id | recall@k | mrr | keyword | judge | judge reason |"
-            sep = "|---|---|---|---|---|---|"
-        else:
-            header = "| id | recall@k | mrr | keyword |"
-            sep = "|---|---|---|---|"
+        deepeval_keys = sorted({k for r in results for k in r.deepeval_scores})
+        header = "| id | recall@k | mrr | keyword |" + "".join(f" {k} |" for k in deepeval_keys)
+        sep = "|---|---|---|---|" + "---|" * len(deepeval_keys)
         lines.append(header)
         lines.append(sep)
         for r in results:
             row = f"| {r.item_id} | {r.recall_at_k:.2f} | {r.mrr:.2f} | {r.keyword_coverage:.2f} |"
-            if has_judge:
-                judge_val = str(r.judge_score) if r.judge_score is not None else "n/a"
-                reason = re.sub(r"\s+", " ", (r.judge_reason or "").replace("|", "/")).strip()
-                row += f" {judge_val} | {reason} |"
+            for key in deepeval_keys:
+                if key in r.deepeval_scores and not math.isnan(r.deepeval_scores[key]):
+                    row += f" {r.deepeval_scores[key]:.2f} |"
+                else:
+                    row += " n/a |"
             lines.append(row)
         lines.append("")
 
@@ -89,9 +87,14 @@ class MarkdownReporter:
             "mrr": statistics.mean(r.mrr for r in results),
             "keyword_coverage": statistics.mean(r.keyword_coverage for r in results),
         }
-        judge_scores = [r.judge_score for r in results if r.judge_score is not None]
-        if judge_scores:
-            agg["judge_score"] = statistics.mean(judge_scores)
+        for key in sorted({k for r in results for k in r.deepeval_scores}):
+            vals = [
+                r.deepeval_scores[key]
+                for r in results
+                if key in r.deepeval_scores and not math.isnan(r.deepeval_scores[key])
+            ]
+            if vals:
+                agg[key] = statistics.mean(vals)
         return agg
 
     @staticmethod
