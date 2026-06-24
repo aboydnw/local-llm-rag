@@ -1,0 +1,43 @@
+from pathlib import Path
+
+from rag_lab.loaders.github_issues import GitHubIssuesLoader
+
+
+def _fake_fetch(repo, number):
+    issue = {
+        "title": "What is titiler?",
+        "body": "A dynamic tile server.",
+        "html_url": f"https://github.com/{repo}/issues/{number}",
+        "state": "open",
+        "labels": [{"name": "question"}, {"name": "docs"}],
+    }
+    comments = [
+        {"user": {"login": "alice"}, "body": "It wraps rio-tiler."},
+        {"user": {"login": "bob"}, "body": "See the README."},
+    ]
+    return issue, comments
+
+
+def test_issue_document_includes_title_body_and_comments():
+    loader = GitHubIssuesLoader("developmentseed/titiler", [42], fetch_fn=_fake_fetch)
+    (doc,) = list(loader.load())
+    assert "What is titiler?" in doc.text
+    assert "A dynamic tile server." in doc.text
+    assert "It wraps rio-tiler." in doc.text
+    assert "bob" in doc.text
+
+
+def test_issue_document_metadata():
+    loader = GitHubIssuesLoader("developmentseed/titiler", [42], fetch_fn=_fake_fetch)
+    (doc,) = list(loader.load())
+    assert doc.path == Path("developmentseed/titiler#42")
+    assert doc.metadata["source"] == "developmentseed/titiler#42"
+    assert doc.metadata["number"] == "42"
+    assert doc.metadata["url"] == "https://github.com/developmentseed/titiler/issues/42"
+    assert doc.metadata["state"] == "open"
+    assert doc.metadata["labels"] == "question, docs"
+
+
+def test_loader_yields_one_document_per_number():
+    loader = GitHubIssuesLoader("o/r", [1, 2, 3], fetch_fn=_fake_fetch)
+    assert len(list(loader.load())) == 3
