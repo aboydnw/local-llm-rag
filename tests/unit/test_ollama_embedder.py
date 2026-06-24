@@ -1,6 +1,6 @@
 import pytest
 
-from rag_lab.embedders.ollama import OllamaEmbedder
+from rag_lab.embedders.ollama import OllamaEmbedder, prefixes_for_model
 
 
 class _FakeOllamaClient:
@@ -40,3 +40,27 @@ def test_embed_passes_model_name_to_client(monkeypatch: pytest.MonkeyPatch) -> N
 def test_dimension_is_exposed() -> None:
     embedder = OllamaEmbedder(model="x", dimension=12)
     assert embedder.dimension == 12
+
+
+def test_prefixes_for_nomic():
+    assert prefixes_for_model("nomic-embed-text") == ("search_document: ", "search_query: ")
+
+
+def test_prefixes_for_unknown_model_are_empty():
+    assert prefixes_for_model("some-other-model") == ("", "")
+
+
+def test_embed_documents_adds_document_prefix(monkeypatch):
+    e = OllamaEmbedder("nomic-embed-text", 768, document_prefix="search_document: ", query_prefix="search_query: ")
+    seen = {}
+    monkeypatch.setattr(e, "embed", lambda texts: seen.setdefault("texts", texts) or [[0.0]] * len(texts))
+    e.embed_documents(["hello", "world"])
+    assert seen["texts"] == ["search_document: hello", "search_document: world"]
+
+
+def test_embed_query_adds_query_prefix(monkeypatch):
+    e = OllamaEmbedder("nomic-embed-text", 768, document_prefix="search_document: ", query_prefix="search_query: ")
+    seen = {}
+    monkeypatch.setattr(e, "embed", lambda texts: seen.setdefault("texts", texts) or [[0.0]] * len(texts))
+    e.embed_query("hello")
+    assert seen["texts"] == ["search_query: hello"]

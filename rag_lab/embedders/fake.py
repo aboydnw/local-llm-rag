@@ -21,3 +21,9 @@ class FakeEmbedder:
             ]
             out.append(values)
         return out
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self.embed(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed([text])[0]
