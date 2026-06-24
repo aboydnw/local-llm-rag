@@ -16,6 +16,44 @@ def test_corpus_roundtrips_through_dict():
     assert Corpus.from_dict(c.to_dict()) == c
 
 
+def test_github_source_roundtrips_private_flag():
+    s = Source(type="github", repo="owner/internal", private=True)
+    assert Source.from_dict(s.to_dict()) == s
+
+
+def test_github_source_defaults_to_public():
+    s = Source.from_dict({"type": "github", "repo": "owner/public"})
+    assert s.private is False
+
+
+def test_github_issue_source_roundtrips():
+    s = Source(type="github_issue", repo="developmentseed/titiler", issue=42)
+    assert Source.from_dict(s.to_dict()) == s
+
+
+def test_parse_issue_ref_extracts_repo_and_number():
+    assert corpora.parse_issue_ref("developmentseed/titiler#42") == ("developmentseed/titiler", 42)
+
+
+@pytest.mark.parametrize("bad", ["", "owner/repo", "owner/repo#", "owner#42", "owner/repo#x"])
+def test_validate_issue_ref_rejects_malformed(bad):
+    assert corpora.validate_issue_ref(bad) is not None
+
+
+def test_validate_issue_ref_accepts_valid():
+    assert corpora.validate_issue_ref("owner/repo#7") is None
+
+
+def test_from_dict_rejects_non_bool_private():
+    with pytest.raises(ValueError):
+        Source.from_dict({"type": "github", "repo": "o/r", "private": "false"})
+
+
+def test_from_dict_rejects_non_int_issue():
+    with pytest.raises(ValueError):
+        Source.from_dict({"type": "github_issue", "repo": "o/r", "issue": "5"})
+
+
 def test_to_dict_rejects_unknown_source_type():
     with pytest.raises(ValueError):
         Source(type="web", path="https://example.com").to_dict()

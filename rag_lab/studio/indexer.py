@@ -8,6 +8,7 @@ from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.config import Config
 from rag_lab.loaders.combined import CombinedLoader
 from rag_lab.loaders.github import GitHubLoader
+from rag_lab.loaders.github_issues import GitHubIssuesLoader
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
@@ -64,7 +65,11 @@ def loader_for_corpus(workspace: Workspace, corpus: Corpus) -> CombinedLoader:
             if not source.repo:
                 raise ValueError("GitHub source is missing 'repo'")
             clone_into = workspace.clone_dir(source.repo.replace("/", "__"))
-            loaders.append(GitHubLoader(source.repo, clone_into))
+            loaders.append(GitHubLoader(source.repo, clone_into, private=source.private))
+        elif source.type == "github_issue":
+            if not source.repo or source.issue is None:
+                raise ValueError("GitHub issue source is missing 'repo' or 'issue'")
+            loaders.append(GitHubIssuesLoader(source.repo, [source.issue]))
         elif source.type == "local":
             if not source.path:
                 raise ValueError("Local source is missing 'path'")

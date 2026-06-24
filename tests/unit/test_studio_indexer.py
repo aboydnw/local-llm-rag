@@ -141,3 +141,24 @@ def test_loader_for_corpus_builds_one_loader_per_source(tmp_path):
     assert loader.loaders[0].root == corpus_dir
     assert isinstance(loader.loaders[1], GitHubLoader)
     assert loader.loaders[1].repo == "https://github.com/owner/name.git"
+
+
+def test_loader_for_corpus_passes_private_flag(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    corpus = Corpus(name="kb", sources=(Source(type="github", repo="o/internal", private=True),))
+    loader = indexer.loader_for_corpus(ws, corpus)
+    assert loader.loaders[0].private is True
+
+
+def test_loader_for_corpus_builds_issue_loader(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    corpus = Corpus(
+        name="kb",
+        sources=(Source(type="github_issue", repo="o/r", issue=7),),
+    )
+    loader = indexer.loader_for_corpus(ws, corpus)
+    inner = loader.loaders[0]
+    assert inner.repo == "o/r"
+    assert inner.numbers == [7]
