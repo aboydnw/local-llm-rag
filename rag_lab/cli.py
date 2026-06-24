@@ -258,7 +258,7 @@ def eval(  # noqa: A001
         try:
             from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
 
-            scorer = DeepEvalScorer(model=cfg.llm.model)
+            scorer = DeepEvalScorer(model=cfg.eval.deepeval_model or cfg.llm.model)
         except ModuleNotFoundError as exc:
             typer.echo(
                 "DeepEval is enabled but not installed. Run `uv sync --extra deepeval`.",

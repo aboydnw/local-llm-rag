@@ -72,7 +72,7 @@ def run_eval(
     if config.eval.deepeval:
         from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
 
-        scorer = DeepEvalScorer(model=config.llm.model)
+        scorer = DeepEvalScorer(model=config.eval.deepeval_model or config.llm.model)
     runner = EvalRunner(
         retriever=retriever, llm=llm, k=config.retriever.k, deepeval_scorer=scorer
     )
