@@ -21,10 +21,17 @@ def render() -> None:
     golden = Path(st.session_state["golden"])
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
+    cfg.eval.deepeval = st.checkbox(
+        "DeepEval scoring",
+        value=cfg.eval.deepeval,
+        help="Adds LLM-judged answer-quality metrics (relevancy, faithfulness) on top of the "
+        "always-on retrieval + keyword metrics. Slower — each metric is an extra Ollama call "
+        f"({cfg.llm.model}) per question.",
+    )
     if cfg.eval.deepeval:
-        st.info(f"DeepEval scoring: enabled ({cfg.llm.model})")
+        st.caption(f"LLM-judged metrics on, scored by {cfg.llm.model}.")
     else:
-        st.info("DeepEval scoring: disabled — set `eval.deepeval: true` in rag.yml to enable.")
+        st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
     if st.button("Run eval", type="primary"):
         if not golden.exists():
