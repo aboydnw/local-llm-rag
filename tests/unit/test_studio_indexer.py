@@ -149,3 +149,16 @@ def test_loader_for_corpus_passes_private_flag(tmp_path):
     corpus = Corpus(name="kb", sources=(Source(type="github", repo="o/internal", private=True),))
     loader = indexer.loader_for_corpus(ws, corpus)
     assert loader.loaders[0].private is True
+
+
+def test_loader_for_corpus_builds_issue_loader(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    corpus = Corpus(
+        name="kb",
+        sources=(Source(type="github_issue", repo="o/r", issue=7),),
+    )
+    loader = indexer.loader_for_corpus(ws, corpus)
+    inner = loader.loaders[0]
+    assert inner.repo == "o/r"
+    assert inner.numbers == [7]
