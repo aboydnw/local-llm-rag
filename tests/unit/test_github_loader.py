@@ -37,3 +37,13 @@ def test_github_loader_normalizes_short_form(monkeypatch: pytest.MonkeyPatch, tm
     loader = GitHubLoader("owner/name", clone_into=fake_clone_dir, clone_fn=fake_clone)
     list(loader.load())
     assert seen["repo"] == "https://github.com/owner/name.git"
+
+
+def test_github_loader_stamps_source_metadata(tmp_path):
+    def fake_clone(repo, dest):
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "README.md").write_text("# R\n\nHello.")
+
+    loader = GitHubLoader("developmentseed/titiler", clone_into=tmp_path / "repo", clone_fn=fake_clone)
+    docs = list(loader.load())
+    assert all(d.metadata["source"] == "developmentseed/titiler" for d in docs)

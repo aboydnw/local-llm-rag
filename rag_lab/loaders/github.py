@@ -1,3 +1,4 @@
+import dataclasses
 import subprocess
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -22,6 +23,7 @@ class GitHubLoader:
         clone_into: Path,
         clone_fn: Callable[[str, Path], None] = _default_clone,
     ) -> None:
+        self.source = repo
         self.repo = repo if repo.startswith("http") else f"https://github.com/{repo}.git"
         self.clone_into = clone_into
         self._clone_fn = clone_fn
@@ -35,4 +37,5 @@ class GitHubLoader:
                 self.clone_into.mkdir(parents=True, exist_ok=True)
                 self._clone_fn(self.repo, self.clone_into)
             self._cloned = True
-        yield from MarkdownLoader(self.clone_into).load()
+        for doc in MarkdownLoader(self.clone_into).load():
+            yield dataclasses.replace(doc, metadata={**doc.metadata, "source": self.source})
