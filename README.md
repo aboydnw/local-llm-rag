@@ -43,6 +43,9 @@ local model, and prints an answer followed by a numbered source list. Use `--sho
 see what was retrieved, and `rag-lab inspect chunks` to debug the index.
 
 Configuration lives in `rag.yml` — swap the chunker, embedder, retriever weights, or LLM there.
+This is your local working config (gitignored once created); `config init` writes a default to
+start from. The ready-made setups under `examples/` are versioned and meant to be copied or
+pointed at, not edited in place.
 
 ## Evaluating quality
 

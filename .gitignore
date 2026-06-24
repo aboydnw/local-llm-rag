@@ -11,3 +11,6 @@ build/
 *.egg-info/
 htmlcov/
 .coverage
+.rag-lab/
+.deepeval/
+/rag.yml
