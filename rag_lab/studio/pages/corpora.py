@@ -40,9 +40,10 @@ def render() -> None:
     corpus = corpora_mod.load_corpus(ws, selected)
 
     st.subheader("GitHub repos")
-    if not corpus.sources:
+    repo_sources = [s for s in corpus.sources if s.type == "github"]
+    if not repo_sources:
         st.caption("No repos yet.")
-    for source in corpus.sources:
+    for source in repo_sources:
         col1, col2 = st.columns([4, 1])
         col1.write(source.repo)
         if col2.button("Remove", key=f"rm-{source.repo}"):
@@ -60,6 +61,35 @@ def render() -> None:
                 ws,
                 corpora_mod.add_source(
                     corpus, Source(type="github", repo=repo.strip(), private=private)
+                ),
+            )
+            st.rerun()
+
+    st.subheader("GitHub issues")
+    issue_sources = [s for s in corpus.sources if s.type == "github_issue"]
+    if not issue_sources:
+        st.caption("No issues yet.")
+    for source in issue_sources:
+        ref = f"{source.repo}#{source.issue}"
+        col1, col2 = st.columns([4, 1])
+        col1.write(ref)
+        if col2.button("Remove", key=f"rm-issue-{ref}"):
+            corpora_mod.save_corpus(ws, corpora_mod.remove_source(corpus, source))
+            st.rerun()
+
+    issue_ref = st.text_input(
+        "Add an issue (owner/repo#123)", placeholder="developmentseed/titiler#42"
+    )
+    if st.button("Add issue"):
+        reason = corpora_mod.validate_issue_ref(issue_ref)
+        if reason:
+            st.error(reason)
+        else:
+            repo_name, number = corpora_mod.parse_issue_ref(issue_ref)
+            corpora_mod.save_corpus(
+                ws,
+                corpora_mod.add_source(
+                    corpus, Source(type="github_issue", repo=repo_name, issue=number)
                 ),
             )
             st.rerun()
