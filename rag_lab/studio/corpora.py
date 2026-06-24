@@ -34,13 +34,15 @@ class Source:
     @classmethod
     def from_dict(cls, data: dict) -> "Source":
         if data["type"] == "github":
-            return cls(
-                type="github",
-                repo=data["repo"],
-                private=bool(data.get("private", False)),
-            )
+            private = data.get("private", False)
+            if not isinstance(private, bool):
+                raise ValueError(f"'private' must be a boolean, got {type(private).__name__}")
+            return cls(type="github", repo=data["repo"], private=private)
         if data["type"] == "github_issue":
-            return cls(type="github_issue", repo=data["repo"], issue=int(data["issue"]))
+            issue = data["issue"]
+            if not isinstance(issue, int) or isinstance(issue, bool):
+                raise ValueError(f"'issue' must be an integer, got {type(issue).__name__}")
+            return cls(type="github_issue", repo=data["repo"], issue=issue)
         if data["type"] == "local":
             return cls(type="local", path=data["path"])
         raise ValueError(f"unsupported source type: {data['type']!r}")

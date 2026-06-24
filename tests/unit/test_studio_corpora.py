@@ -44,6 +44,16 @@ def test_validate_issue_ref_accepts_valid():
     assert corpora.validate_issue_ref("owner/repo#7") is None
 
 
+def test_from_dict_rejects_non_bool_private():
+    with pytest.raises(ValueError):
+        Source.from_dict({"type": "github", "repo": "o/r", "private": "false"})
+
+
+def test_from_dict_rejects_non_int_issue():
+    with pytest.raises(ValueError):
+        Source.from_dict({"type": "github_issue", "repo": "o/r", "issue": "5"})
+
+
 def test_to_dict_rejects_unknown_source_type():
     with pytest.raises(ValueError):
         Source(type="web", path="https://example.com").to_dict()
