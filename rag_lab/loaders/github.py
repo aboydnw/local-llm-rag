@@ -1,4 +1,6 @@
 import dataclasses
+import os
+import shutil
 import subprocess
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -6,11 +8,20 @@ from pathlib import Path
 from rag_lab.loaders.markdown import MarkdownLoader
 from rag_lab.types import Document
 
+CLONE_TIMEOUT_SECONDS = 300
+
+
+def _noninteractive_env() -> dict[str, str]:
+    return {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+
 
 def _default_clone(repo_url: str, dest: Path) -> None:
     subprocess.run(
         ["git", "clone", "--depth", "1", repo_url, str(dest)],
         check=True,
+        timeout=CLONE_TIMEOUT_SECONDS,
+        stdin=subprocess.DEVNULL,
+        env=_noninteractive_env(),
     )
 
 
@@ -18,6 +29,9 @@ def _gh_clone(repo_url: str, dest: Path) -> None:
     subprocess.run(
         ["gh", "repo", "clone", repo_url, str(dest), "--", "--depth", "1"],
         check=True,
+        timeout=CLONE_TIMEOUT_SECONDS,
+        stdin=subprocess.DEVNULL,
+        env=_noninteractive_env(),
     )
 
 
@@ -47,7 +61,11 @@ class GitHubLoader:
                 pass
             else:
                 self.clone_into.mkdir(parents=True, exist_ok=True)
-                self._clone_fn(self._clone_target, self.clone_into)
+                try:
+                    self._clone_fn(self._clone_target, self.clone_into)
+                except BaseException:
+                    shutil.rmtree(self.clone_into, ignore_errors=True)
+                    raise
             self._cloned = True
         for doc in MarkdownLoader(self.clone_into).load():
             yield dataclasses.replace(doc, metadata={**doc.metadata, "source": self.source})
