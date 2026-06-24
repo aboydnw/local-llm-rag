@@ -6,6 +6,7 @@ from rag_lab.studio.workspace import Workspace
 
 _LOCAL_NAME = "__local__"
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_ISSUE_RE = re.compile(r"^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+)$")
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class Source:
     repo: str | None = None
     path: str | None = None
     private: bool = False
+    issue: int | None = None
 
     def to_dict(self) -> dict:
         if self.type == "github":
@@ -23,6 +25,8 @@ class Source:
             if self.private:
                 d["private"] = True
             return d
+        if self.type == "github_issue":
+            return {"type": "github_issue", "repo": self.repo or "", "issue": self.issue}
         if self.type == "local":
             return {"type": "local", "path": self.path or ""}
         raise ValueError(f"unsupported source type: {self.type!r}")
@@ -35,6 +39,8 @@ class Source:
                 repo=data["repo"],
                 private=bool(data.get("private", False)),
             )
+        if data["type"] == "github_issue":
+            return cls(type="github_issue", repo=data["repo"], issue=int(data["issue"]))
         if data["type"] == "local":
             return cls(type="local", path=data["path"])
         raise ValueError(f"unsupported source type: {data['type']!r}")
@@ -85,6 +91,21 @@ def validate_repo(repo: str) -> str | None:
     """Return a reason ``repo`` is not a valid ``owner/name``, or ``None``."""
     if not _REPO_RE.match(repo.strip()):
         return "Enter a GitHub repo as owner/name, e.g. developmentseed/titiler."
+    return None
+
+
+def parse_issue_ref(ref: str) -> tuple[str, int] | None:
+    """Parse ``owner/repo#123`` into ``(repo, number)``, or ``None`` if malformed."""
+    match = _ISSUE_RE.match(ref.strip())
+    if match is None:
+        return None
+    return match.group(1), int(match.group(2))
+
+
+def validate_issue_ref(ref: str) -> str | None:
+    """Return a reason ``ref`` is not a valid ``owner/repo#123``, or ``None``."""
+    if parse_issue_ref(ref) is None:
+        return "Enter an issue as owner/repo#123, e.g. developmentseed/titiler#42."
     return None
 
 
