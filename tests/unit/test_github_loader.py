@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -42,7 +43,7 @@ def test_github_loader_normalizes_short_form(monkeypatch: pytest.MonkeyPatch, tm
 def test_private_repo_clones_via_gh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls: list[list[str]] = []
 
-    def fake_run(argv, check):
+    def fake_run(argv, **kwargs):
         calls.append(argv)
         dest = Path(argv[argv.index("--") - 1])
         dest.mkdir(parents=True, exist_ok=True)
@@ -58,7 +59,7 @@ def test_private_repo_clones_via_gh(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 def test_private_clone_passes_owner_repo_not_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     captured: dict[str, list[str]] = {}
 
-    def fake_run(argv, check):
+    def fake_run(argv, **kwargs):
         captured["argv"] = argv
         dest = Path(argv[argv.index("--") - 1])
         dest.mkdir(parents=True, exist_ok=True)
@@ -69,6 +70,52 @@ def test_private_clone_passes_owner_repo_not_url(monkeypatch: pytest.MonkeyPatch
     list(loader.load())
     assert "owner/internal" in captured["argv"]
     assert all("https://" not in arg for arg in captured["argv"])
+
+
+def test_default_clone_runs_noninteractively_with_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict = {}
+
+    def fake_run(argv, **kwargs):
+        captured.update(kwargs)
+        captured["argv"] = argv
+        Path(argv[-1]).mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("rag_lab.loaders.github.subprocess.run", fake_run)
+    loader = GitHubLoader("owner/name", clone_into=tmp_path / "repo")
+    list(loader.load())
+    assert captured["timeout"]
+    assert captured["stdin"] == subprocess.DEVNULL
+    assert captured["env"]["GIT_TERMINAL_PROMPT"] == "0"
+
+
+def test_private_clone_runs_noninteractively_with_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict = {}
+
+    def fake_run(argv, **kwargs):
+        captured.update(kwargs)
+        dest = Path(argv[argv.index("--") - 1])
+        dest.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("rag_lab.loaders.github.subprocess.run", fake_run)
+    loader = GitHubLoader("owner/internal", clone_into=tmp_path / "repo", private=True)
+    list(loader.load())
+    assert captured["timeout"]
+    assert captured["stdin"] == subprocess.DEVNULL
+    assert captured["env"]["GIT_TERMINAL_PROMPT"] == "0"
+
+
+def test_failed_clone_is_not_cached_as_complete(tmp_path: Path) -> None:
+    clone_dir = tmp_path / "repo"
+
+    def flaky_clone(repo: str, dest: Path) -> None:
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "partial.md").write_text("# only half written")
+        raise RuntimeError("clone interrupted")
+
+    loader = GitHubLoader("owner/name", clone_into=clone_dir, clone_fn=flaky_clone)
+    with pytest.raises(RuntimeError):
+        list(loader.load())
+    assert not clone_dir.exists()
 
 
 def test_github_loader_stamps_source_metadata(tmp_path):
