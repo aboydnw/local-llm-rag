@@ -38,3 +38,29 @@ def test_run_skips_api_stub_chunks(tmp_path: Path) -> None:
     )
     assert count == 1
     assert store.count() == 1
+
+
+class _BadgeWallLoader:
+    def load(self):
+        from pathlib import Path
+
+        from rag_lab.types import Document
+
+        yield Document(
+            path=Path("readme.md"),
+            text='# Title\n\n<p align="center">\n<img src="logo.png"/>\n</p>\n\nTiTiler is a dynamic tile server.\n',
+        )
+
+
+def test_run_strips_markup_from_chunk_text(tmp_path):
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    total = ingest.run(
+        loader=_BadgeWallLoader(),
+        chunker=MarkdownAwareChunker(max_tokens=512, overlap=50),
+        embedder=FakeEmbedder(dimension=16),
+        store=store,
+    )
+    assert total == 1
+    chunk = store.query_bm25("titiler", k=1)[0][0]
+    assert "<img" not in chunk.text
+    assert "TiTiler is a dynamic tile server." in chunk.text
