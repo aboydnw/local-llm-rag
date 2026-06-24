@@ -30,6 +30,6 @@ def run(
 
 
 def _flush(batch: list[Chunk], embedder: Embedder, store: SqliteVecStore) -> int:
-    vectors = embedder.embed([c.text for c in batch])
+    vectors = embedder.embed_documents([c.text for c in batch])
     store.upsert(batch, vectors)
     return len(batch)

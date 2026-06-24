@@ -6,7 +6,7 @@ from rag_lab import __version__
 from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
-from rag_lab.embedders.ollama import OllamaEmbedder
+from rag_lab.embedders.ollama import OllamaEmbedder, prefixes_for_model
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.reporter import MarkdownReporter
 from rag_lab.eval.runner import EvalRunner
@@ -89,7 +89,13 @@ def ingest(
         chunker = MarkdownAwareChunker(
             max_tokens=cfg.chunker.max_tokens, overlap=cfg.chunker.overlap
         )
-        embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
+        document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
+        embedder = OllamaEmbedder(
+            model=cfg.embedder.model,
+            dimension=dimension,
+            document_prefix=document_prefix,
+            query_prefix=query_prefix,
+        )
         store = SqliteVecStore(db, dimension=dimension)
 
         typer.echo(f"Ingesting into {db}...")
@@ -129,7 +135,13 @@ def ask(
         typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
         raise typer.Exit(code=1) from exc
     store = SqliteVecStore(db, dimension=dimension)
-    embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
+    document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
+    embedder = OllamaEmbedder(
+        model=cfg.embedder.model,
+        dimension=dimension,
+        document_prefix=document_prefix,
+        query_prefix=query_prefix,
+    )
     retriever = HybridRetriever(
         vector=VectorRetriever(store=store, embedder=embedder),
         bm25=BM25Retriever(store=store),
@@ -224,7 +236,13 @@ def eval(  # noqa: A001
         raise typer.Exit(code=1) from exc
 
     store = SqliteVecStore(db, dimension=dimension)
-    embedder = OllamaEmbedder(model=cfg.embedder.model, dimension=dimension)
+    document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
+    embedder = OllamaEmbedder(
+        model=cfg.embedder.model,
+        dimension=dimension,
+        document_prefix=document_prefix,
+        query_prefix=query_prefix,
+    )
     retriever = HybridRetriever(
         vector=VectorRetriever(store=store, embedder=embedder),
         bm25=BM25Retriever(store=store),

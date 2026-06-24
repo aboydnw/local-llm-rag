@@ -9,7 +9,7 @@ class VectorRetriever:
         self.embedder = embedder
 
     def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
-        vector = self.embedder.embed([query])[0]
+        vector = self.embedder.embed_query(query)
         hits = self.store.query_vector(vector, k=k)
         return [
             RetrievalResult(chunk=chunk, score=-distance, source="vector")
