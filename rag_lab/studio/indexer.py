@@ -64,7 +64,7 @@ def loader_for_corpus(workspace: Workspace, corpus: Corpus) -> CombinedLoader:
             if not source.repo:
                 raise ValueError("GitHub source is missing 'repo'")
             clone_into = workspace.clone_dir(source.repo.replace("/", "__"))
-            loaders.append(GitHubLoader(source.repo, clone_into))
+            loaders.append(GitHubLoader(source.repo, clone_into, private=source.private))
         elif source.type == "local":
             if not source.path:
                 raise ValueError("Local source is missing 'path'")
