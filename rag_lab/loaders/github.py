@@ -38,6 +38,7 @@ class GitHubLoader:
         if clone_fn is None:
             clone_fn = _gh_clone if private else _default_clone
         self._clone_fn = clone_fn
+        self._clone_target = self.source if private else self.repo
         self._cloned = False
 
     def load(self) -> Iterator[Document]:
@@ -46,7 +47,7 @@ class GitHubLoader:
                 pass
             else:
                 self.clone_into.mkdir(parents=True, exist_ok=True)
-                self._clone_fn(self.repo, self.clone_into)
+                self._clone_fn(self._clone_target, self.clone_into)
             self._cloned = True
         for doc in MarkdownLoader(self.clone_into).load():
             yield dataclasses.replace(doc, metadata={**doc.metadata, "source": self.source})
