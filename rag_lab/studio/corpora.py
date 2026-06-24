@@ -15,18 +15,26 @@ class Source:
     type: str
     repo: str | None = None
     path: str | None = None
+    private: bool = False
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict:
         if self.type == "github":
-            return {"type": "github", "repo": self.repo or ""}
+            d: dict = {"type": "github", "repo": self.repo or ""}
+            if self.private:
+                d["private"] = True
+            return d
         if self.type == "local":
             return {"type": "local", "path": self.path or ""}
         raise ValueError(f"unsupported source type: {self.type!r}")
 
     @classmethod
-    def from_dict(cls, data: dict[str, str]) -> "Source":
+    def from_dict(cls, data: dict) -> "Source":
         if data["type"] == "github":
-            return cls(type="github", repo=data["repo"])
+            return cls(
+                type="github",
+                repo=data["repo"],
+                private=bool(data.get("private", False)),
+            )
         if data["type"] == "local":
             return cls(type="local", path=data["path"])
         raise ValueError(f"unsupported source type: {data['type']!r}")

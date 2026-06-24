@@ -16,6 +16,16 @@ def test_corpus_roundtrips_through_dict():
     assert Corpus.from_dict(c.to_dict()) == c
 
 
+def test_github_source_roundtrips_private_flag():
+    s = Source(type="github", repo="owner/internal", private=True)
+    assert Source.from_dict(s.to_dict()) == s
+
+
+def test_github_source_defaults_to_public():
+    s = Source.from_dict({"type": "github", "repo": "owner/public"})
+    assert s.private is False
+
+
 def test_to_dict_rejects_unknown_source_type():
     with pytest.raises(ValueError):
         Source(type="web", path="https://example.com").to_dict()
