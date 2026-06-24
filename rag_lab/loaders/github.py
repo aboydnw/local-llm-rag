@@ -14,6 +14,13 @@ def _default_clone(repo_url: str, dest: Path) -> None:
     )
 
 
+def _gh_clone(repo_url: str, dest: Path) -> None:
+    subprocess.run(
+        ["gh", "repo", "clone", repo_url, str(dest), "--", "--depth", "1"],
+        check=True,
+    )
+
+
 class GitHubLoader:
     """Shallow-clone a GitHub repo to a working directory, then load its markdown."""
 
@@ -21,11 +28,15 @@ class GitHubLoader:
         self,
         repo: str,
         clone_into: Path,
-        clone_fn: Callable[[str, Path], None] = _default_clone,
+        clone_fn: Callable[[str, Path], None] | None = None,
+        private: bool = False,
     ) -> None:
         self.source = repo
         self.repo = repo if repo.startswith("http") else f"https://github.com/{repo}.git"
         self.clone_into = clone_into
+        self.private = private
+        if clone_fn is None:
+            clone_fn = _gh_clone if private else _default_clone
         self._clone_fn = clone_fn
         self._cloned = False
 

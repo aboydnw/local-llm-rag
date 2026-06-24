@@ -39,6 +39,22 @@ def test_github_loader_normalizes_short_form(monkeypatch: pytest.MonkeyPatch, tm
     assert seen["repo"] == "https://github.com/owner/name.git"
 
 
+def test_private_repo_clones_via_gh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(argv, check):
+        calls.append(argv)
+        dest = Path(argv[argv.index("--") - 1])
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "README.md").write_text("# Private\n\nSecret docs.")
+
+    monkeypatch.setattr("rag_lab.loaders.github.subprocess.run", fake_run)
+    loader = GitHubLoader("owner/internal", clone_into=tmp_path / "repo", private=True)
+    docs = list(loader.load())
+    assert calls and calls[0][0] == "gh"
+    assert [d.path.name for d in docs] == ["README.md"]
+
+
 def test_github_loader_stamps_source_metadata(tmp_path):
     def fake_clone(repo, dest):
         dest.mkdir(parents=True, exist_ok=True)
