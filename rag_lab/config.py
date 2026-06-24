@@ -33,6 +33,7 @@ class RetrieverConfig(BaseModel):
 
 class EvalConfig(BaseModel):
     deepeval: bool = False
+    deepeval_model: str | None = None
 
 
 class Config(BaseModel):

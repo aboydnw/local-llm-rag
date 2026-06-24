@@ -29,7 +29,15 @@ def render() -> None:
         f"({cfg.llm.model}) per question.",
     )
     if cfg.eval.deepeval:
-        st.caption(f"LLM-judged metrics on, scored by {cfg.llm.model}.")
+        judge = st.text_input(
+            "Judge model",
+            value=cfg.eval.deepeval_model or "",
+            placeholder=cfg.llm.model,
+            help="Ollama model that scores the answers. Leave blank to reuse the answer LLM; "
+            "set a stronger model here so the judge isn't grading its own homework.",
+        ).strip()
+        cfg.eval.deepeval_model = judge or None
+        st.caption(f"LLM-judged metrics on, scored by {cfg.eval.deepeval_model or cfg.llm.model}.")
     else:
         st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
