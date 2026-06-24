@@ -50,13 +50,17 @@ def render() -> None:
             st.rerun()
 
     repo = st.text_input("Add a repo (owner/name)", placeholder="developmentseed/titiler")
+    private = st.checkbox("Private repo (clone via gh CLI)")
     if st.button("Add repo"):
         reason = corpora_mod.validate_repo(repo)
         if reason:
             st.error(reason)
         else:
             corpora_mod.save_corpus(
-                ws, corpora_mod.add_source(corpus, Source(type="github", repo=repo.strip()))
+                ws,
+                corpora_mod.add_source(
+                    corpus, Source(type="github", repo=repo.strip(), private=private)
+                ),
             )
             st.rerun()
 
