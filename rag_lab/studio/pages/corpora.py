@@ -44,9 +44,11 @@ def render() -> None:
     if not repo_sources:
         st.caption("No repos yet.")
     for source in repo_sources:
+        visibility = "private" if source.private else "public"
+        label = f"{source.repo} ({visibility})" if source.private else source.repo
         col1, col2 = st.columns([4, 1])
-        col1.write(source.repo)
-        if col2.button("Remove", key=f"rm-{source.repo}"):
+        col1.write(label)
+        if col2.button("Remove", key=f"rm-{source.repo}-{visibility}"):
             corpora_mod.save_corpus(ws, corpora_mod.remove_source(corpus, source))
             st.rerun()
 
