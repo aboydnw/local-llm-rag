@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from rag_lab.loaders.github_issues import GitHubIssuesLoader
 
 
@@ -41,3 +43,20 @@ def test_issue_document_metadata():
 def test_loader_yields_one_document_per_number():
     loader = GitHubIssuesLoader("o/r", [1, 2, 3], fetch_fn=_fake_fetch)
     assert len(list(loader.load())) == 3
+
+
+def test_pull_request_is_rejected():
+    def fetch(repo, number):
+        issue = {
+            "title": "A PR",
+            "body": "body",
+            "html_url": "url",
+            "state": "open",
+            "labels": [],
+            "pull_request": {"url": "https://api.github.com/.../pulls/5"},
+        }
+        return issue, []
+
+    loader = GitHubIssuesLoader("o/r", [5], fetch_fn=fetch)
+    with pytest.raises(ValueError):
+        list(loader.load())

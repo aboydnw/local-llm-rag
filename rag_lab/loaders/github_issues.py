@@ -9,9 +9,9 @@ IssueFetch = Callable[[str, int], tuple[dict, list[dict]]]
 
 
 def _gh_fetch(repo: str, number: int) -> tuple[dict, list[dict]]:
-    def _api(path: str) -> object:
+    def _api(path: str, *extra: str) -> object:
         out = subprocess.run(
-            ["gh", "api", path],
+            ["gh", "api", path, *extra],
             check=True,
             capture_output=True,
             text=True,
@@ -19,7 +19,7 @@ def _gh_fetch(repo: str, number: int) -> tuple[dict, list[dict]]:
         return json.loads(out)
 
     issue = _api(f"repos/{repo}/issues/{number}")
-    comments = _api(f"repos/{repo}/issues/{number}/comments")
+    comments = _api(f"repos/{repo}/issues/{number}/comments", "--paginate")
     return issue, comments
 
 
@@ -58,6 +58,8 @@ class GitHubIssuesLoader:
     def load(self) -> Iterator[Document]:
         for number in self.numbers:
             issue, comments = self._fetch_fn(self.repo, number)
+            if issue.get("pull_request"):
+                raise ValueError(f"{self.repo}#{number} is a pull request, not an issue")
             yield Document(
                 path=Path(f"{self.repo}#{number}"),
                 text=_render(issue, comments),
