@@ -8,18 +8,39 @@ from rag_lab.types import Document
 IssueFetch = Callable[[str, int], tuple[dict, list[dict]]]
 
 
+def _load_paginated_array(out: str) -> list:
+    """Parse ``gh api --paginate`` output for an array endpoint into one list.
+
+    Handles both a single concatenated JSON array and pages emitted as separate
+    back-to-back JSON arrays, so it does not depend on a particular gh version's
+    pagination output format.
+    """
+    out = out.strip()
+    if not out:
+        return []
+    decoder = json.JSONDecoder()
+    items: list = []
+    idx = 0
+    while idx < len(out):
+        page, end = decoder.raw_decode(out, idx)
+        items.extend(page)
+        idx = end
+        while idx < len(out) and out[idx].isspace():
+            idx += 1
+    return items
+
+
 def _gh_fetch(repo: str, number: int) -> tuple[dict, list[dict]]:
-    def _api(path: str, *extra: str) -> object:
-        out = subprocess.run(
+    def _run(path: str, *extra: str) -> str:
+        return subprocess.run(
             ["gh", "api", path, *extra],
             check=True,
             capture_output=True,
             text=True,
         ).stdout
-        return json.loads(out)
 
-    issue = _api(f"repos/{repo}/issues/{number}")
-    comments = _api(f"repos/{repo}/issues/{number}/comments", "--paginate")
+    issue = json.loads(_run(f"repos/{repo}/issues/{number}"))
+    comments = _load_paginated_array(_run(f"repos/{repo}/issues/{number}/comments", "--paginate"))
     return issue, comments
 
 

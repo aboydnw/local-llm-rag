@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rag_lab.loaders.github_issues import GitHubIssuesLoader
+from rag_lab.loaders.github_issues import GitHubIssuesLoader, _load_paginated_array
 
 
 def _fake_fetch(repo, number):
@@ -43,6 +43,19 @@ def test_issue_document_metadata():
 def test_loader_yields_one_document_per_number():
     loader = GitHubIssuesLoader("o/r", [1, 2, 3], fetch_fn=_fake_fetch)
     assert len(list(loader.load())) == 3
+
+
+def test_load_paginated_array_single_merged():
+    assert _load_paginated_array('[{"id": 1}, {"id": 2}]') == [{"id": 1}, {"id": 2}]
+
+
+def test_load_paginated_array_concatenated_pages():
+    assert _load_paginated_array('[{"id": 1}][{"id": 2}]') == [{"id": 1}, {"id": 2}]
+
+
+def test_load_paginated_array_handles_empty():
+    assert _load_paginated_array("[]") == []
+    assert _load_paginated_array("") == []
 
 
 def test_pull_request_is_rejected():
