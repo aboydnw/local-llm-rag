@@ -90,7 +90,9 @@ def build_index(
     if loader is None:
         loader = loader_for_corpus(workspace, corpus)
     chunker = MarkdownAwareChunker(
-        max_tokens=config.chunker.max_tokens, overlap=config.chunker.overlap
+        max_tokens=config.chunker.max_tokens,
+        overlap=config.chunker.overlap,
+        context_header=config.chunker.context_header,
     )
     key = cache_key(corpus, config)
     db_path = workspace.index_db(key)

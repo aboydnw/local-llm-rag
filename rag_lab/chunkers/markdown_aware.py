@@ -11,11 +11,12 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 class MarkdownAwareChunker:
     """Split markdown documents on headings, then enforce a token cap with overlap."""
 
-    def __init__(self, max_tokens: int = 512, overlap: int = 50) -> None:
+    def __init__(self, max_tokens: int = 512, overlap: int = 50, context_header: bool = False) -> None:
         if overlap >= max_tokens:
             raise ValueError("overlap must be smaller than max_tokens")
         self.max_tokens = max_tokens
         self.overlap = overlap
+        self.context_header = context_header
         self._encoder = tiktoken.get_encoding("cl100k_base")
 
     def chunk(self, document: Document) -> Iterator[Chunk]:
@@ -24,14 +25,22 @@ class MarkdownAwareChunker:
             if not body.strip():
                 continue
             for chunk_text in self._split_body(body):
+                text = chunk_text
+                if self.context_header:
+                    text = f"{self._header(document, heading_path)}\n\n{chunk_text}"
                 yield Chunk(
-                    text=chunk_text,
+                    text=text,
                     doc_path=document.path,
                     heading_path=heading_path,
                     position=position,
                     metadata=dict(document.metadata),
                 )
                 position += 1
+
+    @staticmethod
+    def _header(document: Document, heading_path: tuple[str, ...]) -> str:
+        label = document.metadata.get("source") or document.path.name
+        return " > ".join([label, *heading_path])
 
     def _iter_sections(self, text: str) -> Iterator[tuple[tuple[str, ...], str]]:
         stack: list[tuple[int, str]] = []

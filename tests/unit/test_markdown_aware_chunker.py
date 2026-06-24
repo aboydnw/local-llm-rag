@@ -48,3 +48,41 @@ def test_empty_section_emits_no_chunk() -> None:
     paths = [c.heading_path for c in chunks]
     assert ("Top", "Empty") not in paths
     assert ("Top", "Has content") in paths
+
+
+def test_context_header_prepends_source_and_heading():
+    from pathlib import Path
+
+    from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
+    from rag_lab.types import Document
+
+    doc = Document(
+        path=Path("index.md"),
+        text="# Intro\n\nTiTiler is a dynamic tile server.",
+        metadata={"source": "developmentseed/titiler"},
+    )
+    chunk = next(MarkdownAwareChunker(context_header=True).chunk(doc))
+    assert chunk.text.startswith("developmentseed/titiler > Intro\n\n")
+    assert "TiTiler is a dynamic tile server." in chunk.text
+
+
+def test_context_header_falls_back_to_filename():
+    from pathlib import Path
+
+    from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
+    from rag_lab.types import Document
+
+    doc = Document(path=Path("guide.md"), text="# Intro\n\nBody text.", metadata={})
+    chunk = next(MarkdownAwareChunker(context_header=True).chunk(doc))
+    assert chunk.text.startswith("guide.md > Intro\n\n")
+
+
+def test_no_context_header_by_default():
+    from pathlib import Path
+
+    from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
+    from rag_lab.types import Document
+
+    doc = Document(path=Path("guide.md"), text="# Intro\n\nBody text.", metadata={})
+    chunk = next(MarkdownAwareChunker().chunk(doc))
+    assert chunk.text == "Body text."

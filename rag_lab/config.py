@@ -9,6 +9,7 @@ class ChunkerConfig(BaseModel):
     type: Literal["markdown_aware", "fixed"] = "markdown_aware"
     max_tokens: int = Field(default=512, gt=0)
     overlap: int = Field(default=50, ge=0)
+    context_header: bool = True
 
 
 class EmbedderConfig(BaseModel):
@@ -72,6 +73,7 @@ chunker:
   type: markdown_aware
   max_tokens: 512
   overlap: 50
+  context_header: true
 embedder:
   type: ollama
   model: nomic-embed-text

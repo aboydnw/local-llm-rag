@@ -87,7 +87,9 @@ def ingest(
             loader = MarkdownLoader(source)
 
         chunker = MarkdownAwareChunker(
-            max_tokens=cfg.chunker.max_tokens, overlap=cfg.chunker.overlap
+            max_tokens=cfg.chunker.max_tokens,
+            overlap=cfg.chunker.overlap,
+            context_header=cfg.chunker.context_header,
         )
         document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
         embedder = OllamaEmbedder(
