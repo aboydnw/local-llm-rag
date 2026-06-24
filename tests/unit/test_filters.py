@@ -1,4 +1,4 @@
-from rag_lab.filters import is_api_stub
+from rag_lab.filters import is_api_stub, strip_markup
 
 
 def test_bare_directive_is_stub():
@@ -37,3 +37,25 @@ def test_admonition_with_indented_content_is_not_stub():
 def test_empty_text_is_not_stub():
     assert is_api_stub("") is False
     assert is_api_stub("   \n  ") is False
+
+
+def test_strip_markup_removes_html_only_lines():
+    text = '<p align="center">\n<img src="logo.png"/>\nTiTiler is a dynamic tile server.'
+    assert strip_markup(text) == "TiTiler is a dynamic tile server."
+
+
+def test_strip_markup_removes_standalone_image():
+    assert strip_markup("![logo](logo.png)\nReal prose here.") == "Real prose here."
+
+
+def test_strip_markup_removes_badge_links():
+    text = "[![Build](https://img.shields.io/x.svg)](https://ci.example.com)\nProse."
+    assert strip_markup(text) == "Prose."
+
+
+def test_strip_markup_keeps_plain_prose():
+    assert strip_markup("A normal sentence.\nAnother line.") == "A normal sentence.\nAnother line."
+
+
+def test_strip_markup_all_markup_returns_empty():
+    assert strip_markup('<p align="center">\n<img src="x.png"/>') == ""

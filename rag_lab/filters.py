@@ -19,3 +19,27 @@ def is_api_stub(text: str) -> bool:
             continue
         return False
     return has_directive
+
+
+_HTML_ONLY_RE = re.compile(r"^(?:<[^>]+>\s*)+$")
+_IMAGE_ONLY_RE = re.compile(r"^!\[[^\]]*\]\([^)]*\)$")
+_BADGE_ONLY_RE = re.compile(r"^\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)$")
+_BLANK_RUN_RE = re.compile(r"\n{3,}")
+
+
+def strip_markup(text: str) -> str:
+    """Remove markup-only lines (HTML, standalone images, badges); keep prose."""
+    kept: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            kept.append("")
+            continue
+        if (
+            _HTML_ONLY_RE.match(stripped)
+            or _IMAGE_ONLY_RE.match(stripped)
+            or _BADGE_ONLY_RE.match(stripped)
+        ):
+            continue
+        kept.append(line)
+    return _BLANK_RUN_RE.sub("\n\n", "\n".join(kept)).strip()
