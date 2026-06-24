@@ -49,3 +49,29 @@ def test_build_embedder_dimension_matches_model():
     r = components.build_embedder(Config())
     assert r.model == "nomic-embed-text"
     assert r.dimension == 768
+
+
+def test_build_retriever_wraps_with_reranker_when_enabled():
+    from rag_lab.config import Config
+    from rag_lab.embedders.fake import FakeEmbedder
+    from rag_lab.retrievers.reranking import RerankingRetriever
+    from rag_lab.store.sqlite_vec import SqliteVecStore
+    from rag_lab.studio import components
+
+    cfg = Config()
+    cfg.retriever.reranker = "llm"
+    store = SqliteVecStore(":memory:", dimension=16)
+    retriever = components.build_retriever(store, FakeEmbedder(16), cfg)
+    assert isinstance(retriever, RerankingRetriever)
+
+
+def test_build_retriever_is_plain_when_reranker_none():
+    from rag_lab.config import Config
+    from rag_lab.embedders.fake import FakeEmbedder
+    from rag_lab.retrievers.reranking import RerankingRetriever
+    from rag_lab.store.sqlite_vec import SqliteVecStore
+    from rag_lab.studio import components
+
+    store = SqliteVecStore(":memory:", dimension=16)
+    retriever = components.build_retriever(store, FakeEmbedder(16), Config())
+    assert not isinstance(retriever, RerankingRetriever)

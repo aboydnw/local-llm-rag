@@ -26,6 +26,8 @@ class RetrieverConfig(BaseModel):
     bm25_weight: float = Field(default=0.5, ge=0, le=1)
     vector_weight: float = Field(default=0.5, ge=0, le=1)
     k: int = Field(default=5, gt=0)
+    reranker: Literal["none", "llm"] = "none"
+    rerank_candidates: int = Field(default=30, gt=0)
 
 
 class EvalConfig(BaseModel):
@@ -81,6 +83,8 @@ retriever:
   bm25_weight: 0.5
   vector_weight: 0.5
   k: 5
+  reranker: none
+  rerank_candidates: 30
 eval:
   deepeval: false
 """
