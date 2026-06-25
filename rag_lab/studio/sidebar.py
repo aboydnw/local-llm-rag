@@ -155,20 +155,25 @@ def render(session) -> Config:
         else:
             st.sidebar.warning("⚠ this config needs a build")
 
+    def _reset_prompt() -> None:
+        st.session_state["prompt_system_instructions"] = DEFAULT_SYSTEM_INSTRUCTIONS
+
+    if "prompt_system_instructions" not in st.session_state:
+        st.session_state["prompt_system_instructions"] = cfg.prompt.system_instructions
     cfg.prompt.system_instructions = st.sidebar.text_area(
         "Answer prompt (system instructions)",
-        value=cfg.prompt.system_instructions,
+        key="prompt_system_instructions",
         height=160,
         help="Instructions sent to the LLM before the retrieved context. "
         "Changing this does not require rebuilding the index.",
     )
-    if st.sidebar.button("Reset prompt to default"):
-        cfg.prompt.system_instructions = DEFAULT_SYSTEM_INSTRUCTIONS
-        st.rerun()
+    st.sidebar.button("Reset prompt to default", on_click=_reset_prompt)
 
     col1, col2 = st.sidebar.columns(2)
     if col1.button("Save to rag.yml"):
-        Path("rag.yml").write_text(yaml.safe_dump(cfg.model_dump()))
+        Path("rag.yml").write_text(
+            yaml.safe_dump(cfg.model_dump(), allow_unicode=True), encoding="utf-8"
+        )
         st.sidebar.toast("Saved rag.yml")
     if col2.button("Build index", disabled=corpus_error is not None):
         try:
