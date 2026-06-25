@@ -41,7 +41,9 @@ def render() -> None:
             store = SqliteVecStore(db_path, dimension=embedder.dimension)
             retriever = components.build_retriever(store, embedder, cfg)
             results = retriever.retrieve(question, k=cfg.retriever.k)
-            prompt = PromptBuilder().build(question=question, results=results)
+            prompt = PromptBuilder(
+                system_instructions=cfg.prompt.system_instructions
+            ).build(question=question, results=results)
             answer = components.build_llm(cfg).generate(prompt)
         except Exception as exc:  # noqa: BLE001
             st.error(f"Retrieval/generation failed: {exc}")

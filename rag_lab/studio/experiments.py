@@ -10,6 +10,7 @@ from rag_lab.config import Config, config_summary
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.reporter import MarkdownReporter
 from rag_lab.eval.runner import EvalRunner
+from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
 from rag_lab.studio import indexer as indexer_mod
@@ -74,7 +75,11 @@ def run_eval(
 
         scorer = DeepEvalScorer(model=config.eval.deepeval_model or config.llm.model)
     runner = EvalRunner(
-        retriever=retriever, llm=llm, k=config.retriever.k, deepeval_scorer=scorer
+        retriever=retriever,
+        llm=llm,
+        k=config.retriever.k,
+        deepeval_scorer=scorer,
+        prompt_builder=PromptBuilder(system_instructions=config.prompt.system_instructions),
     )
 
     items = golden_set_mod.load_golden_set(golden_path)

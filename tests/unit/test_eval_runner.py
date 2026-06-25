@@ -4,6 +4,7 @@ import pytest
 
 from rag_lab.eval.golden_set import GoldenItem
 from rag_lab.eval.runner import EvalRunner
+from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
 
@@ -59,6 +60,24 @@ def test_runner_scores_each_golden_item() -> None:
     assert miss.recall_at_k == 0.0
     assert miss.keyword_coverage == 0.0
     assert isinstance(hit.actual_answer, str)
+
+
+def test_runner_uses_provided_prompt_builder() -> None:
+    seen = {}
+
+    class _CapturingLLM:
+        def generate(self, prompt: str) -> str:
+            seen["prompt"] = prompt
+            return "ok"
+
+    runner = EvalRunner(
+        retriever=_StubRetriever(["a.md"]),
+        llm=_CapturingLLM(),
+        k=1,
+        prompt_builder=PromptBuilder(system_instructions="HAIKU MODE."),
+    )
+    runner.run([GoldenItem(id="x", question="q")])
+    assert "HAIKU MODE." in seen["prompt"]
 
 
 def test_runner_rejects_non_positive_k() -> None:

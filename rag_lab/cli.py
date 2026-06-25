@@ -151,7 +151,7 @@ def ask(
         bm25_weight=cfg.retriever.bm25_weight,
     )
     llm = OllamaLLM(model=cfg.llm.model)
-    builder = PromptBuilder()
+    builder = PromptBuilder(system_instructions=cfg.prompt.system_instructions)
 
     top_k = k or cfg.retriever.k
     results = retriever.retrieve(question, k=top_k)
@@ -266,7 +266,11 @@ def eval(  # noqa: A001
             )
             raise typer.Exit(code=1) from exc
     runner = EvalRunner(
-        retriever=retriever, llm=llm, k=cfg.retriever.k, deepeval_scorer=scorer,
+        retriever=retriever,
+        llm=llm,
+        k=cfg.retriever.k,
+        deepeval_scorer=scorer,
+        prompt_builder=PromptBuilder(system_instructions=cfg.prompt.system_instructions),
     )
 
     items = golden_set_mod.load_golden_set(golden)

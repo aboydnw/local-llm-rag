@@ -4,6 +4,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, Field
 
+from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
+
 
 class ChunkerConfig(BaseModel):
     type: Literal["markdown_aware", "fixed"] = "markdown_aware"
@@ -36,12 +38,17 @@ class EvalConfig(BaseModel):
     deepeval_model: str | None = None
 
 
+class PromptConfig(BaseModel):
+    system_instructions: str = DEFAULT_SYSTEM_INSTRUCTIONS
+
+
 class Config(BaseModel):
     chunker: ChunkerConfig = ChunkerConfig()
     embedder: EmbedderConfig = EmbedderConfig()
     llm: LLMConfig = LLMConfig()
     retriever: RetrieverConfig = RetrieverConfig()
     eval: EvalConfig = EvalConfig()
+    prompt: PromptConfig = PromptConfig()
 
 
 EMBEDDING_DIMENSIONS: dict[str, int] = {
@@ -94,9 +101,14 @@ eval:
 
 
 def load_config(path: Path) -> Config:
-    raw = yaml.safe_load(path.read_text()) or {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return Config(**raw)
 
 
 def write_default_config(path: Path) -> None:
-    path.write_text(DEFAULT_CONFIG_YAML)
+    prompt_yaml = yaml.safe_dump(
+        {"prompt": {"system_instructions": DEFAULT_SYSTEM_INSTRUCTIONS}},
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    path.write_text(DEFAULT_CONFIG_YAML + prompt_yaml, encoding="utf-8")
