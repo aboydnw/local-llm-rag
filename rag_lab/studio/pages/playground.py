@@ -34,7 +34,7 @@ def render() -> None:
     if not question:
         return
 
-    with st.spinner("Retrieving and generating..."):
+    with st.spinner("Retrieving..."):
         try:
             db_path = indexer_mod.ensure_index(ws, corpus, cfg)
             embedder = components.build_embedder(cfg)
@@ -44,13 +44,17 @@ def render() -> None:
             prompt = PromptBuilder(
                 system_instructions=cfg.prompt.system_instructions
             ).build(question=question, results=results)
-            answer = components.build_llm(cfg).generate(prompt)
         except Exception as exc:  # noqa: BLE001
-            st.error(f"Retrieval/generation failed: {exc}")
+            st.error(f"Retrieval failed: {exc}")
             return
 
     st.subheader("Answer")
-    st.write(answer)
+    try:
+        answer = st.write_stream(components.build_llm(cfg).stream(prompt))
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Generation failed: {exc}")
+        return
+
     st.subheader("Retrieved chunks")
     for i, r in enumerate(results, start=1):
         heading = " > ".join(r.chunk.heading_path) or "(no heading)"

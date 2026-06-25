@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from functools import lru_cache
 
 import httpx
@@ -16,8 +17,14 @@ class OllamaLLM:
         self.model = model
 
     def generate(self, prompt: str) -> str:
-        response = _client().chat(
+        return "".join(self.stream(prompt))
+
+    def stream(self, prompt: str) -> Iterator[str]:
+        for chunk in _client().chat(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
-        )
-        return response["message"]["content"]
+            stream=True,
+        ):
+            piece = chunk["message"]["content"]
+            if piece:
+                yield piece
