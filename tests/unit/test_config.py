@@ -4,7 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from rag_lab import config as config_mod
-from rag_lab.config import Config, load_config
+from rag_lab.config import Config, load_config, write_default_config
+from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
 
 def test_load_config_parses_yaml(tmp_path: Path) -> None:
@@ -69,3 +70,19 @@ def test_config_summary_mentions_key_knobs():
     assert "hybrid" in summary
     assert "llama3.2:3b" in summary
     assert "nomic-embed-text" in summary
+
+
+def test_config_prompt_defaults_to_canonical_instructions():
+    assert Config().prompt.system_instructions == DEFAULT_SYSTEM_INSTRUCTIONS
+
+
+def test_default_config_file_roundtrips_prompt(tmp_path):
+    path = tmp_path / "rag.yml"
+    write_default_config(path)
+    assert load_config(path).prompt.system_instructions == DEFAULT_SYSTEM_INSTRUCTIONS
+
+
+def test_load_config_reads_custom_prompt(tmp_path):
+    path = tmp_path / "rag.yml"
+    path.write_text("prompt:\n  system_instructions: 'Be terse.'\n")
+    assert load_config(path).prompt.system_instructions == "Be terse."
