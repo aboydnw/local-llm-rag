@@ -4,6 +4,7 @@ import streamlit as st
 import yaml
 
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config, config_summary
+from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio import models as models_mod
@@ -153,6 +154,17 @@ def render(session) -> Config:
             st.sidebar.success("Index: ✓ cached")
         else:
             st.sidebar.warning("⚠ this config needs a build")
+
+    cfg.prompt.system_instructions = st.sidebar.text_area(
+        "Answer prompt (system instructions)",
+        value=cfg.prompt.system_instructions,
+        height=160,
+        help="Instructions sent to the LLM before the retrieved context. "
+        "Changing this does not require rebuilding the index.",
+    )
+    if st.sidebar.button("Reset prompt to default"):
+        cfg.prompt.system_instructions = DEFAULT_SYSTEM_INSTRUCTIONS
+        st.rerun()
 
     col1, col2 = st.sidebar.columns(2)
     if col1.button("Save to rag.yml"):
