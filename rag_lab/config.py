@@ -101,7 +101,7 @@ eval:
 
 
 def load_config(path: Path) -> Config:
-    raw = yaml.safe_load(path.read_text()) or {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return Config(**raw)
 
 
@@ -111,4 +111,4 @@ def write_default_config(path: Path) -> None:
         default_flow_style=False,
         allow_unicode=True,
     )
-    path.write_text(DEFAULT_CONFIG_YAML + prompt_yaml)
+    path.write_text(DEFAULT_CONFIG_YAML + prompt_yaml, encoding="utf-8")
