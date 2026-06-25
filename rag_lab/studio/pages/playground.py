@@ -19,6 +19,13 @@ def render() -> None:
     corpus = corpora_mod.resolve_active_corpus(
         ws, st.session_state.get("corpus_name"), st.session_state["corpus"]
     )
+    if st.session_state.get("corpus_name"):
+        st.caption(f"Querying corpus: **{corpus.label}**")
+    else:
+        st.warning(
+            f"No saved corpus selected — querying the local folder `{corpus.label}`. "
+            "Select a corpus in the sidebar to query it instead."
+        )
     status = indexer_mod.status(ws, corpus, cfg)
     if status.needs_build:
         st.warning("This config has no built index yet. Use **Build index** in the sidebar.")
