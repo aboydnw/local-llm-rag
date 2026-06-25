@@ -5,7 +5,7 @@ import frontmatter
 
 from rag_lab.types import Document
 
-_EXCLUDED_DIRS = {".venv", "venv", "node_modules", ".git", "__pycache__", ".tox"}
+_EXCLUDED_DIRS = {".venv", "venv", "node_modules", ".git", "__pycache__", ".tox", ".rag-lab"}
 
 
 class MarkdownLoader:

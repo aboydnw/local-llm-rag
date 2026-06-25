@@ -43,3 +43,13 @@ def test_excludes_venv_and_other_tooling_dirs(tmp_path: Path) -> None:
     loader = MarkdownLoader(tmp_path)
     docs = list(loader.load())
     assert [d.path.name for d in docs] == ["real.md"]
+
+
+def test_excludes_rag_lab_workspace_dir(tmp_path: Path) -> None:
+    (tmp_path / "real.md").write_text("# Real")
+    clone = tmp_path / ".rag-lab" / "clones" / "developmentseed__titiler"
+    clone.mkdir(parents=True)
+    (clone / "README.md").write_text("# Cloned repo noise")
+    loader = MarkdownLoader(tmp_path)
+    docs = list(loader.load())
+    assert [d.path.name for d in docs] == ["real.md"]
