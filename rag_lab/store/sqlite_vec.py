@@ -82,6 +82,14 @@ class SqliteVecStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS index_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
             conn.commit()
 
     def upsert(self, chunks: list[Chunk], vectors: list[list[float]]) -> None:
@@ -139,6 +147,59 @@ class SqliteVecStore:
         with self._connect() as conn:
             (n,) = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
             return int(n)
+
+    def write_manifest(self, manifest: dict) -> None:
+        """Persist index metadata (embedder, dimension, schema version, ...)."""
+        with self._connect() as conn:
+            for key, value in manifest.items():
+                conn.execute(
+                    "INSERT INTO index_meta(key, value) VALUES(?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (key, json.dumps(value)),
+                )
+            conn.commit()
+
+    def read_manifest(self) -> dict:
+        """Return stored index metadata, or ``{}`` if none was recorded."""
+        with self._connect() as conn:
+            try:
+                rows = conn.execute("SELECT key, value FROM index_meta").fetchall()
+            except sqlite3.OperationalError:
+                return {}
+        return {key: json.loads(value) for key, value in rows}
+
+    def delete_by_doc(self, doc_path: Path | str) -> None:
+        """Remove every chunk (and its FTS/vector rows) for a single document."""
+        with self._connect() as conn:
+            self._delete_docs(conn, [str(doc_path)])
+            conn.commit()
+
+    def prune_docs(self, keep: set[str]) -> None:
+        """Remove chunks for any document whose path is not in ``keep``."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT DISTINCT doc_path FROM chunks").fetchall()
+            stale = [path for (path,) in rows if path not in keep]
+            self._delete_docs(conn, stale)
+            conn.commit()
+
+    @staticmethod
+    def _delete_docs(conn: sqlite3.Connection, doc_paths: list[str]) -> None:
+        for doc in doc_paths:
+            ids = [
+                cid
+                for (cid,) in conn.execute(
+                    "SELECT id FROM chunks WHERE doc_path = ?", (doc,)
+                ).fetchall()
+            ]
+            for cid in ids:
+                row = conn.execute(
+                    "SELECT rowid FROM vec_ids WHERE chunk_id = ?", (cid,)
+                ).fetchone()
+                if row is not None:
+                    conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (row[0],))
+                    conn.execute("DELETE FROM vec_ids WHERE chunk_id = ?", (cid,))
+                conn.execute("DELETE FROM chunks_fts WHERE chunk_id = ?", (cid,))
+                conn.execute("DELETE FROM chunks WHERE id = ?", (cid,))
 
     def query_bm25(self, query: str, k: int) -> list[tuple[Chunk, float]]:
         match = _to_fts_query(query)

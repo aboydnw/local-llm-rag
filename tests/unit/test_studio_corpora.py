@@ -12,7 +12,10 @@ def _ws(tmp_path):
 
 
 def test_corpus_roundtrips_through_dict():
-    c = Corpus(name="titiler-stack", sources=(Source(type="github", repo="developmentseed/titiler"),))
+    c = Corpus(
+        name="titiler-stack",
+        sources=(Source(type="github", repo="developmentseed/titiler"),),
+    )
     assert Corpus.from_dict(c.to_dict()) == c
 
 

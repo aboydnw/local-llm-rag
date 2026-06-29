@@ -6,7 +6,9 @@ import pytest
 from rag_lab.loaders.github import GitHubLoader
 
 
-def test_github_loader_clones_then_yields_markdown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_github_loader_clones_then_yields_markdown(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     clone_dir = tmp_path / "repo"
     clone_calls: list[str] = []
 
@@ -27,7 +29,9 @@ def test_github_loader_clones_then_yields_markdown(monkeypatch: pytest.MonkeyPat
     assert paths == ["README.md", "guide.md"]
 
 
-def test_github_loader_normalizes_short_form(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_github_loader_normalizes_short_form(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     seen: dict[str, str] = {}
 
     def fake_clone(repo: str, dest: Path) -> None:
@@ -56,7 +60,9 @@ def test_private_repo_clones_via_gh(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert [d.path.name for d in docs] == ["README.md"]
 
 
-def test_private_clone_passes_owner_repo_not_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_private_clone_passes_owner_repo_not_url(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     captured: dict[str, list[str]] = {}
 
     def fake_run(argv, **kwargs):
@@ -72,7 +78,9 @@ def test_private_clone_passes_owner_repo_not_url(monkeypatch: pytest.MonkeyPatch
     assert all("https://" not in arg for arg in captured["argv"])
 
 
-def test_default_clone_runs_noninteractively_with_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_default_clone_runs_noninteractively_with_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     captured: dict = {}
 
     def fake_run(argv, **kwargs):
@@ -88,7 +96,9 @@ def test_default_clone_runs_noninteractively_with_timeout(monkeypatch: pytest.Mo
     assert captured["env"]["GIT_TERMINAL_PROMPT"] == "0"
 
 
-def test_private_clone_runs_noninteractively_with_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_private_clone_runs_noninteractively_with_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     captured: dict = {}
 
     def fake_run(argv, **kwargs):
@@ -123,6 +133,8 @@ def test_github_loader_stamps_source_metadata(tmp_path):
         dest.mkdir(parents=True, exist_ok=True)
         (dest / "README.md").write_text("# R\n\nHello.")
 
-    loader = GitHubLoader("developmentseed/titiler", clone_into=tmp_path / "repo", clone_fn=fake_clone)
+    loader = GitHubLoader(
+        "developmentseed/titiler", clone_into=tmp_path / "repo", clone_fn=fake_clone
+    )
     docs = list(loader.load())
     assert all(d.metadata["source"] == "developmentseed/titiler" for d in docs)

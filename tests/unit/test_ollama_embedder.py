@@ -51,16 +51,26 @@ def test_prefixes_for_unknown_model_are_empty():
 
 
 def test_embed_documents_adds_document_prefix(monkeypatch):
-    e = OllamaEmbedder("nomic-embed-text", 768, document_prefix="search_document: ", query_prefix="search_query: ")
+    e = OllamaEmbedder(
+        "nomic-embed-text", 768,
+        document_prefix="search_document: ", query_prefix="search_query: ",
+    )
     seen = {}
-    monkeypatch.setattr(e, "embed", lambda texts: seen.setdefault("texts", texts) or [[0.0]] * len(texts))
+    monkeypatch.setattr(
+        e, "embed", lambda texts: seen.setdefault("texts", texts) or [[0.0]] * len(texts)
+    )
     e.embed_documents(["hello", "world"])
     assert seen["texts"] == ["search_document: hello", "search_document: world"]
 
 
 def test_embed_query_adds_query_prefix(monkeypatch):
-    e = OllamaEmbedder("nomic-embed-text", 768, document_prefix="search_document: ", query_prefix="search_query: ")
+    e = OllamaEmbedder(
+        "nomic-embed-text", 768,
+        document_prefix="search_document: ", query_prefix="search_query: ",
+    )
     seen = {}
-    monkeypatch.setattr(e, "embed", lambda texts: seen.setdefault("texts", texts) or [[0.0]] * len(texts))
+    monkeypatch.setattr(
+        e, "embed", lambda texts: seen.setdefault("texts", texts) or [[0.0]] * len(texts)
+    )
     e.embed_query("hello")
     assert seen["texts"] == ["search_query: hello"]

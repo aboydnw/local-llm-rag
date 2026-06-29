@@ -40,7 +40,8 @@ def test_report_includes_diff_when_previous_report_exists(tmp_path: Path) -> Non
     prev.write_text(
         "# rag-lab eval report\n\n"
         "## Aggregates\n\n"
-        "| metric | value |\n|---|---|\n| recall@k | 0.50 |\n| mrr | 0.50 |\n| keyword_coverage | 0.75 |\n"
+        "| metric | value |\n|---|---|\n"
+        "| recall@k | 0.50 |\n| mrr | 0.50 |\n| keyword_coverage | 0.75 |\n"
     )
     results = [_make_result("a", 1.0, 1.0, 1.0)]
     out_path = tmp_path / "report.md"

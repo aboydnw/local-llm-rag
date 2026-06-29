@@ -6,7 +6,10 @@ def test_bare_directive_is_stub():
 
 
 def test_directive_with_indented_options_is_stub():
-    assert is_api_stub("::: titiler.core.dependencies\n    options:\n      show_source: true") is True
+    assert (
+        is_api_stub("::: titiler.core.dependencies\n    options:\n      show_source: true")
+        is True
+    )
 
 
 def test_directive_with_surrounding_blank_lines_is_stub():

@@ -6,7 +6,11 @@ from rag_lab.types import Chunk
 
 
 def _r(text):
-    return RetrievalResult(chunk=Chunk(text=text, doc_path=Path("d.md"), heading_path=(), position=0), score=0.0, source="hybrid")
+    return RetrievalResult(
+        chunk=Chunk(text=text, doc_path=Path("d.md"), heading_path=(), position=0),
+        score=0.0,
+        source="hybrid",
+    )
 
 
 class _FakeLLM:

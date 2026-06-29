@@ -2,27 +2,39 @@ from pathlib import Path
 
 import typer
 
-from rag_lab import __version__
+from rag_lab import __version__, pipeline
 from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
-from rag_lab.embedders.ollama import OllamaEmbedder, prefixes_for_model
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.reporter import MarkdownReporter
 from rag_lab.eval.runner import EvalRunner
-from rag_lab.llms.ollama import OllamaLLM
 from rag_lab.loaders.markdown import MarkdownLoader
-from rag_lab.prompts import PromptBuilder
-from rag_lab.retrievers.bm25 import BM25Retriever
-from rag_lab.retrievers.hybrid import HybridRetriever
-from rag_lab.retrievers.vector import VectorRetriever
-from rag_lab.store.sqlite_vec import SqliteVecStore
 
 app = typer.Typer(no_args_is_help=True, help="rag-lab: local-first RAG framework")
 config_app = typer.Typer(no_args_is_help=True, help="Manage rag-lab config files.")
 app.add_typer(config_app, name="config")
 inspect_app = typer.Typer(no_args_is_help=True, help="Inspect what rag-lab indexed.")
 app.add_typer(inspect_app, name="inspect")
+
+
+def _validate_embedder_model(cfg: config_mod.Config) -> None:
+    try:
+        config_mod.embedding_dimension(cfg.embedder.model)
+    except ValueError as exc:
+        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+def _require_compatible_index(store, cfg: config_mod.Config, force: bool) -> None:
+    reason = pipeline.check_index_compatible(store, cfg)
+    if reason is None:
+        return
+    if force:
+        typer.echo(f"Warning: {reason}", err=True)
+    else:
+        typer.echo(reason, err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -66,11 +78,7 @@ def ingest(
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    try:
-        dimension = config_mod.embedding_dimension(cfg.embedder.model)
-    except ValueError as exc:
-        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
-        raise typer.Exit(code=1) from exc
+    _validate_embedder_model(cfg)
 
     loader: object
     workdir: tempfile.TemporaryDirectory | None = None
@@ -91,18 +99,16 @@ def ingest(
             overlap=cfg.chunker.overlap,
             context_header=cfg.chunker.context_header,
         )
-        document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
-        embedder = OllamaEmbedder(
-            model=cfg.embedder.model,
-            dimension=dimension,
-            document_prefix=document_prefix,
-            query_prefix=query_prefix,
-        )
-        store = SqliteVecStore(db, dimension=dimension)
+        embedder = pipeline.build_embedder(cfg)
+        store = pipeline.build_store(cfg, db)
 
         typer.echo(f"Ingesting into {db}...")
         count = ingest_mod.run(
-            loader=loader, chunker=chunker, embedder=embedder, store=store
+            loader=loader,
+            chunker=chunker,
+            embedder=embedder,
+            store=store,
+            manifest=pipeline.index_manifest(cfg),
         )
         typer.echo(f"Done. {count} chunks indexed.")
     finally:
@@ -119,6 +125,9 @@ def ask(
     show_chunks: bool = typer.Option(
         False, "--show-chunks", help="Print retrieved chunks before the answer."
     ),
+    force: bool = typer.Option(
+        False, "--force", help="Query even if the index was built with a different config."
+    ),
 ) -> None:
     """Ask a question against an ingested corpus."""
     if not db.exists():
@@ -131,27 +140,13 @@ def ask(
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    try:
-        dimension = config_mod.embedding_dimension(cfg.embedder.model)
-    except ValueError as exc:
-        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
-        raise typer.Exit(code=1) from exc
-    store = SqliteVecStore(db, dimension=dimension)
-    document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
-    embedder = OllamaEmbedder(
-        model=cfg.embedder.model,
-        dimension=dimension,
-        document_prefix=document_prefix,
-        query_prefix=query_prefix,
-    )
-    retriever = HybridRetriever(
-        vector=VectorRetriever(store=store, embedder=embedder),
-        bm25=BM25Retriever(store=store),
-        vector_weight=cfg.retriever.vector_weight,
-        bm25_weight=cfg.retriever.bm25_weight,
-    )
-    llm = OllamaLLM(model=cfg.llm.model)
-    builder = PromptBuilder(system_instructions=cfg.prompt.system_instructions)
+    _validate_embedder_model(cfg)
+    store = pipeline.build_store(cfg, db)
+    _require_compatible_index(store, cfg, force)
+    embedder = pipeline.build_embedder(cfg)
+    retriever = pipeline.build_retriever(store, embedder, cfg)
+    llm = pipeline.build_llm(cfg)
+    builder = pipeline.build_prompt_builder(cfg)
 
     top_k = k or cfg.retriever.k
     results = retriever.retrieve(question, k=top_k)
@@ -218,6 +213,9 @@ def eval(  # noqa: A001
     previous: Path | None = typer.Option(
         None, "--previous", help="Previous report to diff against."
     ),
+    force: bool = typer.Option(
+        False, "--force", help="Run even if the index was built with a different config."
+    ),
 ) -> None:
     """Run the eval harness against a golden set and write a markdown report."""
     if not golden.exists():
@@ -231,27 +229,12 @@ def eval(  # noqa: A001
         raise typer.Exit(code=1)
 
     cfg = config_mod.load_config(config)
-    try:
-        dimension = config_mod.embedding_dimension(cfg.embedder.model)
-    except ValueError as exc:
-        typer.echo(str(exc) + " — add it to EMBEDDING_DIMENSIONS in config.py.", err=True)
-        raise typer.Exit(code=1) from exc
-
-    store = SqliteVecStore(db, dimension=dimension)
-    document_prefix, query_prefix = prefixes_for_model(cfg.embedder.model)
-    embedder = OllamaEmbedder(
-        model=cfg.embedder.model,
-        dimension=dimension,
-        document_prefix=document_prefix,
-        query_prefix=query_prefix,
-    )
-    retriever = HybridRetriever(
-        vector=VectorRetriever(store=store, embedder=embedder),
-        bm25=BM25Retriever(store=store),
-        vector_weight=cfg.retriever.vector_weight,
-        bm25_weight=cfg.retriever.bm25_weight,
-    )
-    llm = OllamaLLM(model=cfg.llm.model)
+    _validate_embedder_model(cfg)
+    store = pipeline.build_store(cfg, db)
+    _require_compatible_index(store, cfg, force)
+    embedder = pipeline.build_embedder(cfg)
+    retriever = pipeline.build_retriever(store, embedder, cfg)
+    llm = pipeline.build_llm(cfg)
 
     scorer = None
     if cfg.eval.deepeval:
@@ -270,7 +253,7 @@ def eval(  # noqa: A001
         llm=llm,
         k=cfg.retriever.k,
         deepeval_scorer=scorer,
-        prompt_builder=PromptBuilder(system_instructions=cfg.prompt.system_instructions),
+        prompt_builder=pipeline.build_prompt_builder(cfg),
     )
 
     items = golden_set_mod.load_golden_set(golden)
