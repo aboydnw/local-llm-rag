@@ -103,12 +103,14 @@ def build_index(
     key = cache_key(corpus, config)
     db_path = workspace.index_db(key)
     store = SqliteVecStore(db_path, dimension=embedder.dimension)
+    manifest = pipeline.index_manifest(config)
+    manifest["dimension"] = embedder.dimension
     ingest_mod.run(
         loader=loader,
         chunker=chunker,
         embedder=embedder,
         store=store,
-        manifest=pipeline.index_manifest(config),
+        manifest=manifest,
     )
     workspace.index_meta(key).write_text(
         json.dumps(

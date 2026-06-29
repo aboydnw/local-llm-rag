@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from rag_lab import ingest
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.embedders.fake import FakeEmbedder
@@ -93,6 +95,52 @@ def test_reingest_with_no_documents_keeps_existing_index(tmp_path: Path) -> None
     ingest.run(loader=loader, chunker=chunker, embedder=embedder, store=store)
 
     assert store.count() == 1
+
+
+def test_reingest_with_no_documents_keeps_original_manifest(tmp_path: Path) -> None:
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    chunker = MarkdownAwareChunker(max_tokens=1000, overlap=0)
+    embedder = FakeEmbedder(dimension=16)
+    loader = _MutableLoader([Document(path=Path("a.md"), text="# A\n\napple content here\n")])
+    original = {"schema_version": 1, "embedder_model": "real", "dimension": 16}
+
+    ingest.run(loader=loader, chunker=chunker, embedder=embedder, store=store, manifest=original)
+    loader.docs = []
+    ingest.run(
+        loader=loader,
+        chunker=chunker,
+        embedder=embedder,
+        store=store,
+        manifest={"schema_version": 1, "embedder_model": "other", "dimension": 16},
+    )
+
+    assert store.read_manifest() == original
+
+
+class _ExplodingEmbedder:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        self.calls += 1
+        if self.calls > 1:
+            raise RuntimeError("embedder is down")
+        return [[0.0] * 16 for _ in texts]
+
+
+def test_reingest_keeps_existing_document_when_embedder_fails(tmp_path: Path) -> None:
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    chunker = MarkdownAwareChunker(max_tokens=1000, overlap=0)
+    embedder = _ExplodingEmbedder()
+    loader = _MutableLoader([Document(path=Path("d.md"), text="# T\n\noriginal otters\n")])
+
+    ingest.run(loader=loader, chunker=chunker, embedder=embedder, store=store)
+    loader.docs = [Document(path=Path("d.md"), text="# T\n\nrewritten badgers\n")]
+    with pytest.raises(RuntimeError):
+        ingest.run(loader=loader, chunker=chunker, embedder=embedder, store=store)
+
+    assert store.count() == 1
+    assert len(store.query_bm25("otters", k=5)) == 1
 
 
 def test_ingest_writes_manifest_when_provided(tmp_path: Path) -> None:

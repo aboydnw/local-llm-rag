@@ -35,7 +35,9 @@ def run(
         total += _flush(batch, embedder, store, cleared)
     if total > 0:
         store.prune_docs(keep=seen)
-    if manifest is not None:
+        if manifest is not None:
+            store.write_manifest(manifest)
+    elif manifest is not None and store.count() == 0:
         store.write_manifest(manifest)
     return total
 
@@ -43,9 +45,9 @@ def run(
 def _flush(
     batch: list[Chunk], embedder: Embedder, store: SqliteVecStore, cleared: set[str]
 ) -> int:
+    vectors = embedder.embed_documents([c.text for c in batch])
     for doc in {str(c.doc_path) for c in batch} - cleared:
         store.delete_by_doc(doc)
         cleared.add(doc)
-    vectors = embedder.embed_documents([c.text for c in batch])
     store.upsert(batch, vectors)
     return len(batch)
