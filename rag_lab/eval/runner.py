@@ -10,6 +10,15 @@ from rag_lab.retrievers.base import Retriever
 
 
 @dataclass(frozen=True, slots=True)
+class RetrievedRef:
+    rank: int
+    doc_path: str
+    heading_path: tuple[str, ...]
+    position: int
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
 class EvalResult:
     item_id: str
     question: str
@@ -20,6 +29,9 @@ class EvalResult:
     ndcg_at_k: float = 0.0
     average_precision: float = 0.0
     citation_validity: float | None = None
+    retrieved: list[RetrievedRef] = field(default_factory=list)
+    citations: list[int] = field(default_factory=list)
+    latency_ms: dict[str, float] = field(default_factory=dict)
     deepeval_scores: dict[str, float] = field(default_factory=dict)
 
 

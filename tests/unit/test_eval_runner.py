@@ -3,10 +3,25 @@ from pathlib import Path
 import pytest
 
 from rag_lab.eval.golden_set import GoldenItem
-from rag_lab.eval.runner import EvalRunner
+from rag_lab.eval.runner import EvalResult, EvalRunner, RetrievedRef
 from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
+
+
+def test_eval_result_defaults_have_empty_trace_fields() -> None:
+    result = EvalResult(
+        item_id="x", question="q", actual_answer="a",
+        recall_at_k=0.0, mrr=0.0, keyword_coverage=0.0,
+    )
+    assert result.retrieved == []
+    assert result.citations == []
+    assert result.latency_ms == {}
+
+
+def test_retrieved_ref_holds_rank_and_identity() -> None:
+    ref = RetrievedRef(rank=1, doc_path="a.md", heading_path=("H",), position=2, score=0.9)
+    assert (ref.rank, ref.doc_path, ref.position) == (1, "a.md", 2)
 
 
 class _StubRetriever:
