@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
 
 from rag_lab.eval.golden_set import GoldenItem
+from rag_lab.eval.scorers.citation import citation_validity
 from rag_lab.eval.scorers.keyword import keyword_coverage
-from rag_lab.eval.scorers.retrieval import mrr, recall_at_k
+from rag_lab.eval.scorers.retrieval import average_precision, mrr, ndcg_at_k, recall_at_k
 from rag_lab.llms.base import LLM
 from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import Retriever
@@ -16,6 +17,9 @@ class EvalResult:
     recall_at_k: float
     mrr: float
     keyword_coverage: float
+    ndcg_at_k: float = 0.0
+    average_precision: float = 0.0
+    citation_validity: float | None = None
     deepeval_scores: dict[str, float] = field(default_factory=dict)
 
 
@@ -60,6 +64,9 @@ class EvalRunner:
                     recall_at_k=recall_at_k(results, item.ideal_docs, k=self.k),
                     mrr=mrr(results, item.ideal_docs),
                     keyword_coverage=keyword_coverage(answer, item.must_mention),
+                    ndcg_at_k=ndcg_at_k(results, item.ideal_docs, k=self.k),
+                    average_precision=average_precision(results, item.ideal_docs),
+                    citation_validity=citation_validity(answer, len(results)),
                     deepeval_scores=deepeval_scores,
                 )
             )
