@@ -29,6 +29,32 @@ class _StubLLM:
         return "factory class MosaicTilerFactory is the answer"
 
 
+class _CitingLLM:
+    def generate(self, prompt: str) -> str:
+        return "MosaicTilerFactory does this [1]."
+
+
+def test_runner_populates_ndcg_map_and_citation_validity() -> None:
+    items = [
+        GoldenItem(id="hit", question="q", ideal_docs=["correct.md"], must_mention=["factory"]),
+    ]
+    runner = EvalRunner(
+        retriever=_StubRetriever(["correct.md", "extra.md"]),
+        llm=_CitingLLM(),
+        k=3,
+    )
+    result = runner.run(items)[0]
+    assert result.ndcg_at_k == 1.0
+    assert result.average_precision == 1.0
+    assert result.citation_validity == 1.0
+
+
+def test_runner_citation_validity_is_none_without_citations() -> None:
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=1)
+    result = runner.run([GoldenItem(id="x", question="q")])[0]
+    assert result.citation_validity is None
+
+
 def test_runner_scores_each_golden_item() -> None:
     items = [
         GoldenItem(

@@ -63,12 +63,17 @@ class MarkdownReporter:
         lines.append("## Per-question detail")
         lines.append("")
         deepeval_keys = sorted({k for r in results for k in r.deepeval_scores})
-        header = "| id | recall@k | mrr | keyword |" + "".join(f" {k} |" for k in deepeval_keys)
-        sep = "|---|---|---|---|" + "---|" * len(deepeval_keys)
+        header = "| id | recall@k | ndcg@k | mrr | keyword |" + "".join(
+            f" {k} |" for k in deepeval_keys
+        )
+        sep = "|---|---|---|---|---|" + "---|" * len(deepeval_keys)
         lines.append(header)
         lines.append(sep)
         for r in results:
-            row = f"| {r.item_id} | {r.recall_at_k:.2f} | {r.mrr:.2f} | {r.keyword_coverage:.2f} |"
+            row = (
+                f"| {r.item_id} | {r.recall_at_k:.2f} | {r.ndcg_at_k:.2f} | "
+                f"{r.mrr:.2f} | {r.keyword_coverage:.2f} |"
+            )
             for key in deepeval_keys:
                 if key in r.deepeval_scores and not math.isnan(r.deepeval_scores[key]):
                     row += f" {r.deepeval_scores[key]:.2f} |"
@@ -84,9 +89,14 @@ class MarkdownReporter:
             return {}
         agg = {
             "recall@k": statistics.mean(r.recall_at_k for r in results),
+            "ndcg@k": statistics.mean(r.ndcg_at_k for r in results),
+            "map": statistics.mean(r.average_precision for r in results),
             "mrr": statistics.mean(r.mrr for r in results),
             "keyword_coverage": statistics.mean(r.keyword_coverage for r in results),
         }
+        cited = [r.citation_validity for r in results if r.citation_validity is not None]
+        if cited:
+            agg["citation_validity"] = statistics.mean(cited)
         for key in sorted({k for r in results for k in r.deepeval_scores}):
             vals = [
                 r.deepeval_scores[key]
