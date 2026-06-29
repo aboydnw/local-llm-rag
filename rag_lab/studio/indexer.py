@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rag_lab import ingest as ingest_mod
+from rag_lab import pipeline
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.config import Config
 from rag_lab.loaders.combined import CombinedLoader
@@ -102,7 +103,15 @@ def build_index(
     key = cache_key(corpus, config)
     db_path = workspace.index_db(key)
     store = SqliteVecStore(db_path, dimension=embedder.dimension)
-    ingest_mod.run(loader=loader, chunker=chunker, embedder=embedder, store=store)
+    manifest = pipeline.index_manifest(config)
+    manifest["dimension"] = embedder.dimension
+    ingest_mod.run(
+        loader=loader,
+        chunker=chunker,
+        embedder=embedder,
+        store=store,
+        manifest=manifest,
+    )
     workspace.index_meta(key).write_text(
         json.dumps(
             {

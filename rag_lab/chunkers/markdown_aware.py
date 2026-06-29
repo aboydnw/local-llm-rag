@@ -11,7 +11,9 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 class MarkdownAwareChunker:
     """Split markdown documents on headings, then enforce a token cap with overlap."""
 
-    def __init__(self, max_tokens: int = 512, overlap: int = 50, context_header: bool = False) -> None:
+    def __init__(
+        self, max_tokens: int = 512, overlap: int = 50, context_header: bool = False
+    ) -> None:
         if overlap >= max_tokens:
             raise ValueError("overlap must be smaller than max_tokens")
         self.max_tokens = max_tokens

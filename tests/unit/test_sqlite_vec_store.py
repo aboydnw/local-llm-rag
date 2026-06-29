@@ -59,9 +59,12 @@ def test_query_bm25_returns_chunks_matching_keywords(tmp_path: Path) -> None:
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()
     chunks = [
-        Chunk(text="titiler exposes a MosaicTilerFactory class", doc_path=Path("a.md"), heading_path=("Factory",), position=0),
-        Chunk(text="stac-fastapi serves OGC API records", doc_path=Path("b.md"), heading_path=("Records",), position=0),
-        Chunk(text="another unrelated paragraph about pizza", doc_path=Path("c.md"), heading_path=("Misc",), position=0),
+        Chunk(text="titiler exposes a MosaicTilerFactory class", doc_path=Path("a.md"),
+              heading_path=("Factory",), position=0),
+        Chunk(text="stac-fastapi serves OGC API records", doc_path=Path("b.md"),
+              heading_path=("Records",), position=0),
+        Chunk(text="another unrelated paragraph about pizza", doc_path=Path("c.md"),
+              heading_path=("Misc",), position=0),
     ]
     store.upsert(chunks, embedder.embed([c.text for c in chunks]))
     results = store.query_bm25("MosaicTilerFactory", k=2)
@@ -74,7 +77,8 @@ def test_query_bm25_ranks_higher_for_more_keyword_matches(tmp_path: Path) -> Non
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()
     chunks = [
-        Chunk(text="factory class factory pattern factory method", doc_path=Path("a.md"), heading_path=(), position=0),
+        Chunk(text="factory class factory pattern factory method", doc_path=Path("a.md"),
+              heading_path=(), position=0),
         Chunk(text="single factory mention", doc_path=Path("b.md"), heading_path=(), position=0),
     ]
     store.upsert(chunks, embedder.embed([c.text for c in chunks]))
@@ -87,12 +91,72 @@ def test_query_bm25_handles_natural_language_with_punctuation(tmp_path: Path) ->
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()
     chunks = [
-        Chunk(text="the alpha document explains setup", doc_path=Path("a.md"), heading_path=(), position=0),
+        Chunk(text="the alpha document explains setup", doc_path=Path("a.md"),
+              heading_path=(), position=0),
         Chunk(text="unrelated beta content", doc_path=Path("b.md"), heading_path=(), position=0),
     ]
     store.upsert(chunks, embedder.embed([c.text for c in chunks]))
     results = store.query_bm25("what is the alpha document about?", k=2)
     assert results[0][0].text.startswith("the alpha document")
+
+
+def test_delete_by_doc_removes_only_that_docs_chunks(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    chunks = [
+        Chunk(text="alpha one", doc_path=Path("a.md"), heading_path=(), position=0),
+        Chunk(text="alpha two", doc_path=Path("a.md"), heading_path=(), position=1),
+        Chunk(text="beta keyword", doc_path=Path("b.md"), heading_path=(), position=0),
+    ]
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    store.delete_by_doc(Path("a.md"))
+    assert store.count() == 1
+    assert store.query_bm25("alpha", k=5) == []
+    assert len(store.query_bm25("beta", k=5)) == 1
+
+
+def test_delete_by_doc_also_clears_vector_rows(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    chunks = [
+        Chunk(text="alpha one", doc_path=Path("a.md"), heading_path=(), position=0),
+        Chunk(text="beta one", doc_path=Path("b.md"), heading_path=(), position=0),
+    ]
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    store.delete_by_doc(Path("a.md"))
+    results = store.query_vector(embedder.embed(["alpha one"])[0], k=5)
+    assert {str(c.doc_path) for c, _ in results} == {"b.md"}
+
+
+def test_prune_docs_keeps_listed_docs_and_drops_the_rest(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    chunks = [
+        Chunk(text="alpha", doc_path=Path("a.md"), heading_path=(), position=0),
+        Chunk(text="beta", doc_path=Path("b.md"), heading_path=(), position=0),
+        Chunk(text="gamma", doc_path=Path("c.md"), heading_path=(), position=0),
+    ]
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    store.prune_docs(keep={"a.md", "c.md"})
+    assert store.count() == 2
+    assert store.query_bm25("beta", k=5) == []
+
+
+def test_write_manifest_then_read_roundtrips(tmp_path: Path) -> None:
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    manifest = {"schema_version": 1, "embedder_model": "nomic-embed-text", "dimension": 768}
+    store.write_manifest(manifest)
+    assert store.read_manifest() == manifest
+
+
+def test_read_manifest_is_empty_when_nothing_written(tmp_path: Path) -> None:
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    assert store.read_manifest() == {}
 
 
 def test_query_bm25_returns_empty_for_query_with_no_word_tokens(tmp_path: Path) -> None:

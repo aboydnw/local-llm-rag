@@ -14,25 +14,40 @@ def run(
     embedder: Embedder,
     store: SqliteVecStore,
     batch_size: int = 64,
+    manifest: dict | None = None,
 ) -> int:
     store.initialize()
     batch: list[Chunk] = []
+    cleared: set[str] = set()
+    seen: set[str] = set()
     total = 0
     for document in loader.load():
         for chunk in chunker.chunk(document):
             cleaned = strip_markup(chunk.text)
             if not cleaned or is_api_stub(cleaned):
                 continue
+            seen.add(str(chunk.doc_path))
             batch.append(replace(chunk, text=cleaned))
             if len(batch) >= batch_size:
-                total += _flush(batch, embedder, store)
+                total += _flush(batch, embedder, store, cleared)
                 batch = []
     if batch:
-        total += _flush(batch, embedder, store)
+        total += _flush(batch, embedder, store, cleared)
+    if total > 0:
+        store.prune_docs(keep=seen)
+        if manifest is not None:
+            store.write_manifest(manifest)
+    elif manifest is not None and store.count() == 0:
+        store.write_manifest(manifest)
     return total
 
 
-def _flush(batch: list[Chunk], embedder: Embedder, store: SqliteVecStore) -> int:
+def _flush(
+    batch: list[Chunk], embedder: Embedder, store: SqliteVecStore, cleared: set[str]
+) -> int:
     vectors = embedder.embed_documents([c.text for c in batch])
+    for doc in {str(c.doc_path) for c in batch} - cleared:
+        store.delete_by_doc(doc)
+        cleared.add(doc)
     store.upsert(batch, vectors)
     return len(batch)

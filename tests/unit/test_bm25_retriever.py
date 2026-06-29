@@ -11,8 +11,10 @@ def test_bm25_retriever_returns_results_tagged_bm25(tmp_path: Path) -> None:
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()
     chunks = [
-        Chunk(text="MosaicTilerFactory subclass example", doc_path=Path("a.md"), heading_path=(), position=0),
-        Chunk(text="unrelated content about pizza", doc_path=Path("b.md"), heading_path=(), position=0),
+        Chunk(text="MosaicTilerFactory subclass example", doc_path=Path("a.md"),
+              heading_path=(), position=0),
+        Chunk(text="unrelated content about pizza", doc_path=Path("b.md"),
+              heading_path=(), position=0),
     ]
     store.upsert(chunks, embedder.embed([c.text for c in chunks]))
     retriever = BM25Retriever(store=store)

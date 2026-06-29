@@ -22,14 +22,14 @@ def test_ask_returns_answer_with_citations(tmp_path: Path, fixture_corpus: Path)
 
     ask_result = runner.invoke(
         app,
-        ["ask", "what is the alpha document about?", "--config", str(cfg_path), "--db", str(db_path)],
+        ["ask", "what is the alpha document about?",
+         "--config", str(cfg_path), "--db", str(db_path)],
     )
     assert ask_result.exit_code == 0, ask_result.output
     assert len(ask_result.stdout) > 20
 
 
 def test_vector_retriever_uses_embed_query(monkeypatch, tmp_path):
-    from pathlib import Path
 
     from rag_lab.embedders.fake import FakeEmbedder
     from rag_lab.retrievers.vector import VectorRetriever
@@ -39,6 +39,10 @@ def test_vector_retriever_uses_embed_query(monkeypatch, tmp_path):
     store.initialize()
     embedder = FakeEmbedder(16)
     calls = {"documents": 0, "query": 0}
-    monkeypatch.setattr(embedder, "embed_query", lambda text: (calls.__setitem__("query", calls["query"] + 1), FakeEmbedder(16).embed([text])[0])[1])
+    def _tracked_query(text):
+        calls["query"] += 1
+        return FakeEmbedder(16).embed([text])[0]
+
+    monkeypatch.setattr(embedder, "embed_query", _tracked_query)
     VectorRetriever(store=store, embedder=embedder).retrieve("hi", k=3)
     assert calls["query"] == 1
