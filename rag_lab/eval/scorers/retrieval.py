@@ -1,3 +1,5 @@
+import math
+
 from rag_lab.retrievers.base import RetrievalResult
 
 
@@ -20,6 +22,23 @@ def recall_at_k(results: list[RetrievalResult], ideal_docs: list[str], k: int) -
     ideal = set(ideal_docs)
     top = set(ranked_doc_paths(results)[:k])
     return len(ideal & top) / len(ideal)
+
+
+def ndcg_at_k(results: list[RetrievalResult], ideal_docs: list[str], k: int) -> float:
+    if k <= 0:
+        raise ValueError("k must be positive")
+    if not ideal_docs:
+        return 1.0
+    ideal = set(ideal_docs)
+    top = ranked_doc_paths(results)[:k]
+    dcg = sum(
+        1.0 / math.log2(rank + 2)
+        for rank, doc in enumerate(top)
+        if doc in ideal
+    )
+    ideal_hits = min(len(ideal), k)
+    idcg = sum(1.0 / math.log2(rank + 2) for rank in range(ideal_hits))
+    return dcg / idcg if idcg else 0.0
 
 
 def mrr(results: list[RetrievalResult], ideal_docs: list[str]) -> float:
