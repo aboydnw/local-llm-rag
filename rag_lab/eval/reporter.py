@@ -1,5 +1,4 @@
 import math
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -13,15 +12,15 @@ class MarkdownReporter:
         results: list[EvalResult],
         config_summary: str,
         out_path: Path,
-        previous_report: Path | None = None,
+        previous_run: Path | None = None,
     ) -> None:
-        out_path.write_text(self._render(results, config_summary, previous_report))
+        out_path.write_text(self._render(results, config_summary, previous_run))
 
     def _render(
         self,
         results: list[EvalResult],
         config_summary: str,
-        previous_report: Path | None,
+        previous_run: Path | None,
     ) -> str:
         aggregates = self._aggregates(results)
         lines: list[str] = []
@@ -40,10 +39,12 @@ class MarkdownReporter:
             lines.append(f"| {k} | {v:.2f} |")
         lines.append("")
 
-        if previous_report is not None and previous_report.exists():
-            prev = self._parse_aggregates(previous_report.read_text())
+        if previous_run is not None and previous_run.exists():
+            from rag_lab.eval.run_artifact import read_run
+
+            prev = read_run(previous_run).get("aggregates", {})
             if prev:
-                lines.append(f"## Diff vs `{previous_report.name}`")
+                lines.append(f"## Diff vs `{previous_run.name}`")
                 lines.append("")
                 lines.append("| metric | previous | current | delta |")
                 lines.append("|---|---|---|---|")
@@ -86,8 +87,3 @@ class MarkdownReporter:
 
     def _aggregates(self, results: list[EvalResult]) -> dict[str, float]:
         return aggregate_metrics(results)
-
-    @staticmethod
-    def _parse_aggregates(content: str) -> dict[str, float]:
-        rows = re.findall(r"^\|\s*([\w@]+)\s*\|\s*([0-9.]+)\s*\|\s*$", content, re.MULTILINE)
-        return {name: float(value) for name, value in rows}

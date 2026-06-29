@@ -56,25 +56,33 @@ def test_report_includes_new_metric_aggregates(tmp_path: Path) -> None:
     assert "| citation_validity | 1.00 |" in content
 
 
-def test_report_includes_diff_when_previous_report_exists(tmp_path: Path) -> None:
-    prev = tmp_path / "previous.md"
-    prev.write_text(
-        "# rag-lab eval report\n\n"
-        "## Aggregates\n\n"
-        "| metric | value |\n|---|---|\n"
-        "| recall@k | 0.50 |\n| mrr | 0.50 |\n| keyword_coverage | 0.75 |\n"
+def _result_with(recall: float) -> EvalResult:
+    return EvalResult(
+        item_id="a", question="q", actual_answer="a",
+        recall_at_k=recall, mrr=recall, keyword_coverage=recall,
+        ndcg_at_k=recall, average_precision=recall,
     )
-    results = [_make_result("a", 1.0, 1.0, 1.0)]
+
+
+def test_report_diffs_against_previous_run_json(tmp_path: Path) -> None:
+    from rag_lab.eval.run_artifact import write_run
+
+    baseline = tmp_path / "baseline.json"
+    write_run(
+        baseline,
+        [_result_with(recall=0.5)],
+        config_summary="cfg", prompt_version="0000", k=5, created_at="2026-06-29T00:00:00Z",
+    )
     out_path = tmp_path / "report.md"
     MarkdownReporter().write(
-        results=results,
-        config_summary="x",
+        results=[_result_with(recall=1.0)],
+        config_summary="cfg",
         out_path=out_path,
-        previous_report=prev,
+        previous_run=baseline,
     )
     content = out_path.read_text()
     assert "Diff vs" in content
-    assert "+0.50" in content or "+0.5" in content
+    assert "+0.50" in content
 
 
 def test_report_renders_deepeval_aggregate_and_columns(tmp_path: Path) -> None:
