@@ -35,6 +35,27 @@ def test_report_includes_aggregates_and_per_item_rows(tmp_path: Path) -> None:
     assert "| b |" in content
 
 
+def test_report_includes_new_metric_aggregates(tmp_path: Path) -> None:
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="a [1]",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            ndcg_at_k=1.0, average_precision=1.0, citation_validity=1.0,
+        ),
+        EvalResult(
+            item_id="b", question="q", actual_answer="a",
+            recall_at_k=0.5, mrr=0.5, keyword_coverage=0.5,
+            ndcg_at_k=0.5, average_precision=0.5, citation_validity=None,
+        ),
+    ]
+    out_path = tmp_path / "report.md"
+    MarkdownReporter().write(results=results, config_summary="cfg", out_path=out_path)
+    content = out_path.read_text()
+    assert "| ndcg@k | 0.75 |" in content
+    assert "| map | 0.75 |" in content
+    assert "| citation_validity | 1.00 |" in content
+
+
 def test_report_includes_diff_when_previous_report_exists(tmp_path: Path) -> None:
     prev = tmp_path / "previous.md"
     prev.write_text(
