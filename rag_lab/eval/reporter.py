@@ -1,9 +1,9 @@
 import math
 import re
-import statistics
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rag_lab.eval.aggregate import aggregate_metrics
 from rag_lab.eval.runner import EvalResult
 
 
@@ -85,27 +85,7 @@ class MarkdownReporter:
         return "\n".join(lines)
 
     def _aggregates(self, results: list[EvalResult]) -> dict[str, float]:
-        if not results:
-            return {}
-        agg = {
-            "recall@k": statistics.mean(r.recall_at_k for r in results),
-            "ndcg@k": statistics.mean(r.ndcg_at_k for r in results),
-            "map": statistics.mean(r.average_precision for r in results),
-            "mrr": statistics.mean(r.mrr for r in results),
-            "keyword_coverage": statistics.mean(r.keyword_coverage for r in results),
-        }
-        cited = [r.citation_validity for r in results if r.citation_validity is not None]
-        if cited:
-            agg["citation_validity"] = statistics.mean(cited)
-        for key in sorted({k for r in results for k in r.deepeval_scores}):
-            vals = [
-                r.deepeval_scores[key]
-                for r in results
-                if key in r.deepeval_scores and not math.isnan(r.deepeval_scores[key])
-            ]
-            if vals:
-                agg[key] = statistics.mean(vals)
-        return agg
+        return aggregate_metrics(results)
 
     @staticmethod
     def _parse_aggregates(content: str) -> dict[str, float]:
