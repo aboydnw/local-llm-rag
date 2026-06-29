@@ -1,7 +1,13 @@
 import math
 from pathlib import Path
 
-from rag_lab.eval.scorers.retrieval import mrr, ndcg_at_k, ranked_doc_paths, recall_at_k
+from rag_lab.eval.scorers.retrieval import (
+    average_precision,
+    mrr,
+    ndcg_at_k,
+    ranked_doc_paths,
+    recall_at_k,
+)
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
 
@@ -48,6 +54,19 @@ def test_ndcg_at_k_is_0_when_no_relevant_docs_retrieved() -> None:
 
 def test_ndcg_at_k_handles_empty_ideal_docs() -> None:
     assert ndcg_at_k([_result("a.md")], ideal_docs=[], k=5) == 1.0
+
+
+def test_average_precision_rewards_early_relevant_docs() -> None:
+    results = [_result("a.md"), _result("x.md"), _result("b.md")]
+    assert average_precision(results, ideal_docs=["a.md", "b.md"]) == (1.0 + 2.0 / 3.0) / 2.0
+
+
+def test_average_precision_is_0_when_nothing_relevant() -> None:
+    assert average_precision([_result("x.md")], ideal_docs=["a.md"]) == 0.0
+
+
+def test_average_precision_handles_empty_ideal_docs() -> None:
+    assert average_precision([_result("a.md")], ideal_docs=[]) == 1.0
 
 
 def test_mrr_returns_reciprocal_of_first_hit_rank() -> None:

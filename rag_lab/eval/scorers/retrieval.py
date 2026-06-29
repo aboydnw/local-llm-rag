@@ -41,6 +41,19 @@ def ndcg_at_k(results: list[RetrievalResult], ideal_docs: list[str], k: int) -> 
     return dcg / idcg if idcg else 0.0
 
 
+def average_precision(results: list[RetrievalResult], ideal_docs: list[str]) -> float:
+    if not ideal_docs:
+        return 1.0
+    ideal = set(ideal_docs)
+    hits = 0
+    score = 0.0
+    for rank, doc in enumerate(ranked_doc_paths(results), start=1):
+        if doc in ideal:
+            hits += 1
+            score += hits / rank
+    return score / len(ideal)
+
+
 def mrr(results: list[RetrievalResult], ideal_docs: list[str]) -> float:
     if not ideal_docs:
         return 1.0
