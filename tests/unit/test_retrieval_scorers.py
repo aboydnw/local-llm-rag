@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rag_lab.eval.scorers.retrieval import mrr, recall_at_k
+from rag_lab.eval.scorers.retrieval import mrr, ranked_doc_paths, recall_at_k
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
 
@@ -13,21 +13,22 @@ def _result(doc: str) -> RetrievalResult:
     )
 
 
-def test_recall_at_k_returns_1_when_any_ideal_doc_in_top_k() -> None:
+def test_ranked_doc_paths_dedupes_preserving_order() -> None:
+    results = [_result("a.md"), _result("a.md"), _result("b.md")]
+    assert ranked_doc_paths(results) == ["a.md", "b.md"]
+
+
+def test_recall_at_k_is_fraction_of_ideal_docs_found() -> None:
     results = [_result("a.md"), _result("b.md"), _result("c.md")]
-    assert recall_at_k(results, ideal_docs=["b.md"], k=3) == 1.0
-    assert recall_at_k(results, ideal_docs=["b.md", "z.md"], k=3) == 1.0
-
-
-def test_recall_at_k_returns_0_when_no_ideal_doc_in_top_k() -> None:
-    results = [_result("a.md"), _result("b.md")]
-    assert recall_at_k(results, ideal_docs=["z.md"], k=2) == 0.0
+    assert recall_at_k(results, ideal_docs=["a.md", "c.md"], k=3) == 1.0
+    assert recall_at_k(results, ideal_docs=["a.md", "z.md"], k=3) == 0.5
+    assert recall_at_k(results, ideal_docs=["y.md", "z.md"], k=3) == 0.0
 
 
 def test_recall_at_k_respects_k() -> None:
     results = [_result("a.md"), _result("b.md"), _result("c.md")]
-    assert recall_at_k(results, ideal_docs=["c.md"], k=2) == 0.0
-    assert recall_at_k(results, ideal_docs=["c.md"], k=3) == 1.0
+    assert recall_at_k(results, ideal_docs=["a.md", "c.md"], k=2) == 0.5
+    assert recall_at_k(results, ideal_docs=["a.md", "c.md"], k=3) == 1.0
 
 
 def test_mrr_returns_reciprocal_of_first_hit_rank() -> None:
