@@ -7,10 +7,7 @@ def parse_citations(answer: str) -> list[int]:
     """Extract citation numbers from ``[n]`` / ``[n, m]`` markers, in order."""
     numbers: list[int] = []
     for group in _CITATION_RE.findall(answer):
-        for token in group.split(","):
-            token = token.strip()
-            if token:
-                numbers.append(int(token))
+        numbers.extend(int(token) for token in re.findall(r"\d+", group))
     return numbers
 
 

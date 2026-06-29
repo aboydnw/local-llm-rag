@@ -7,7 +7,7 @@ def ranked_doc_paths(results: list[RetrievalResult]) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
     for result in results:
-        doc = str(result.chunk.doc_path)
+        doc = result.chunk.doc_path.as_posix()
         if doc not in seen:
             seen.add(doc)
             ordered.append(doc)
@@ -59,6 +59,6 @@ def mrr(results: list[RetrievalResult], ideal_docs: list[str]) -> float:
         return 1.0
     ideal = set(ideal_docs)
     for rank, result in enumerate(results, start=1):
-        if str(result.chunk.doc_path) in ideal:
+        if result.chunk.doc_path.as_posix() in ideal:
             return 1.0 / rank
     return 0.0

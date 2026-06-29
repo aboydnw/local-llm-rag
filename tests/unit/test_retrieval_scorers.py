@@ -25,6 +25,13 @@ def test_ranked_doc_paths_dedupes_preserving_order() -> None:
     assert ranked_doc_paths(results) == ["a.md", "b.md"]
 
 
+def test_scorers_match_nested_doc_paths_against_posix_ideal_docs() -> None:
+    results = [_result("docs/api/a.md"), _result("docs/b.md")]
+    assert recall_at_k(results, ideal_docs=["docs/api/a.md"], k=2) == 1.0
+    assert mrr(results, ideal_docs=["docs/api/a.md"]) == 1.0
+    assert ranked_doc_paths(results) == ["docs/api/a.md", "docs/b.md"]
+
+
 def test_recall_at_k_is_fraction_of_ideal_docs_found() -> None:
     results = [_result("a.md"), _result("b.md"), _result("c.md")]
     assert recall_at_k(results, ideal_docs=["a.md", "c.md"], k=3) == 1.0

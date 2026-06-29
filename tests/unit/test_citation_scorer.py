@@ -9,6 +9,10 @@ def test_parse_citations_ignores_markdown_links() -> None:
     assert parse_citations("a [link](http://x) and [2]") == [2]
 
 
+def test_parse_citations_handles_whitespace_separated_numbers() -> None:
+    assert parse_citations("see [1 2] and [3]") == [1, 2, 3]
+
+
 def test_citation_validity_is_fraction_pointing_to_real_sources() -> None:
     assert citation_validity("from [1] and [5]", num_sources=3) == 0.5
 
