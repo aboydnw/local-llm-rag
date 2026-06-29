@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -8,6 +9,7 @@ from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.reporter import MarkdownReporter
+from rag_lab.eval.run_artifact import prompt_version, write_run
 from rag_lab.eval.runner import EvalRunner
 from rag_lab.loaders.markdown import MarkdownLoader
 
@@ -211,7 +213,7 @@ def eval(  # noqa: A001
         Path("eval-reports") / "report.md", "--report", help="Output path for the report."
     ),
     previous: Path | None = typer.Option(
-        None, "--previous", help="Previous report to diff against."
+        None, "--previous", help="Previous run.json to diff against."
     ),
     force: bool = typer.Option(
         False, "--force", help="Run even if the index was built with a different config."
@@ -266,9 +268,18 @@ def eval(  # noqa: A001
         results=results,
         config_summary=summary,
         out_path=report,
-        previous_report=previous,
+        previous_run=previous,
+    )
+    write_run(
+        report.parent / "run.json",
+        results,
+        config_summary=summary,
+        prompt_version=prompt_version(cfg.prompt.system_instructions),
+        k=cfg.retriever.k,
+        created_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )
     typer.echo(f"Report written to {report}")
+    typer.echo(f"Run artifact written to {report.parent / 'run.json'}")
 
 
 @app.command()

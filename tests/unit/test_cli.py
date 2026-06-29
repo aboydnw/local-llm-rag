@@ -41,3 +41,9 @@ def test_eval_refuses_when_index_embedder_mismatches_config(tmp_path: Path) -> N
     )
     assert result.exit_code == 1
     assert result.exception is None or isinstance(result.exception, SystemExit)
+
+
+def test_eval_help_documents_previous_run_artifact() -> None:
+    result = runner.invoke(app, ["eval", "--help"])
+    assert result.exit_code == 0
+    assert "run.json" in result.output
