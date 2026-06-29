@@ -49,6 +49,24 @@ class _CitingLLM:
         return "MosaicTilerFactory does this [1]."
 
 
+def test_runner_captures_retrieved_refs_citations_and_latency() -> None:
+    ticks = iter([0.0, 0.010, 0.040])
+
+    runner = EvalRunner(
+        retriever=_StubRetriever(["a.md", "b.md"]),
+        llm=_CitingLLM(),
+        k=2,
+        clock=lambda: next(ticks),
+    )
+    result = runner.run([GoldenItem(id="x", question="q")])[0]
+
+    assert [r.doc_path for r in result.retrieved] == ["a.md", "b.md"]
+    assert result.retrieved[0].rank == 1
+    assert result.citations == [1]
+    assert result.latency_ms["retrieve"] == 10.0
+    assert result.latency_ms["generate"] == 30.0
+
+
 def test_runner_populates_ndcg_map_and_citation_validity() -> None:
     items = [
         GoldenItem(id="hit", question="q", ideal_docs=["correct.md"], must_mention=["factory"]),
