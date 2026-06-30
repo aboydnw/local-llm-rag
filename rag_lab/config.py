@@ -1,8 +1,9 @@
+import math
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
@@ -36,6 +37,28 @@ class RetrieverConfig(BaseModel):
 class EvalConfig(BaseModel):
     deepeval: bool = False
     deepeval_model: str | None = None
+    abstention_markers: list[str] = Field(
+        default_factory=lambda: [
+            "i don't know",
+            "i do not know",
+            "does not contain",
+            "cannot answer",
+            "no information",
+        ]
+    )
+    gates: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("gates")
+    @classmethod
+    def _gate_thresholds_non_negative_and_finite(
+        cls, value: dict[str, float]
+    ) -> dict[str, float]:
+        for metric, max_drop in value.items():
+            if not math.isfinite(max_drop) or max_drop < 0:
+                raise ValueError(
+                    f"gate threshold for {metric!r} must be a non-negative finite number"
+                )
+        return value
 
 
 class PromptConfig(BaseModel):

@@ -10,6 +10,7 @@ class GoldenItem(BaseModel):
     ideal_docs: list[str] = Field(default_factory=list)
     must_mention: list[str] = Field(default_factory=list)
     ideal_answer: str = ""
+    expect_abstention: bool = False
 
 
 def load_golden_set(path: Path) -> list[GoldenItem]:

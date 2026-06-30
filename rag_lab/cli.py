@@ -8,8 +8,10 @@ from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.eval import golden_set as golden_set_mod
+from rag_lab.eval.aggregate import aggregate_metrics
+from rag_lab.eval.gates import gate_failures
 from rag_lab.eval.reporter import MarkdownReporter
-from rag_lab.eval.run_artifact import prompt_version, write_run
+from rag_lab.eval.run_artifact import prompt_version, read_run, write_run
 from rag_lab.eval.runner import EvalRunner
 from rag_lab.loaders.markdown import MarkdownLoader
 
@@ -218,6 +220,9 @@ def eval(  # noqa: A001
     force: bool = typer.Option(
         False, "--force", help="Run even if the index was built with a different config."
     ),
+    baseline: Path | None = typer.Option(
+        None, "--baseline", help="Baseline run.json to gate against (see eval.gates in rag.yml)."
+    ),
 ) -> None:
     """Run the eval harness against a golden set and write a markdown report."""
     if not golden.exists():
@@ -256,6 +261,7 @@ def eval(  # noqa: A001
         k=cfg.retriever.k,
         deepeval_scorer=scorer,
         prompt_builder=pipeline.build_prompt_builder(cfg),
+        abstention_markers=cfg.eval.abstention_markers,
     )
 
     items = golden_set_mod.load_golden_set(golden)
@@ -280,6 +286,31 @@ def eval(  # noqa: A001
     )
     typer.echo(f"Report written to {report}")
     typer.echo(f"Run artifact written to {report.parent / 'run.json'}")
+
+    if baseline is not None and cfg.eval.gates:
+        try:
+            baseline_run = read_run(baseline)
+        except (OSError, ValueError) as exc:
+            typer.echo(f"Baseline run artifact is unreadable: {baseline}", err=True)
+            raise typer.Exit(code=1) from exc
+        if not isinstance(baseline_run, dict):
+            typer.echo(f"Baseline run artifact is not a run.json: {baseline}", err=True)
+            raise typer.Exit(code=1)
+        if baseline_run.get("k") != cfg.retriever.k:
+            typer.echo(
+                f"Baseline was built with k={baseline_run.get('k')} but this run uses "
+                f"k={cfg.retriever.k}; recall@k/ndcg@k are not comparable. "
+                "Rebuild the baseline or align k.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        prev = baseline_run.get("aggregates", {})
+        failures = gate_failures(aggregate_metrics(results), prev, cfg.eval.gates)
+        if failures:
+            typer.echo("Regression gate failed:", err=True)
+            for line in failures:
+                typer.echo(f"  {line}", err=True)
+            raise typer.Exit(code=2)
 
 
 @app.command()

@@ -86,3 +86,22 @@ def test_load_config_reads_custom_prompt(tmp_path):
     path = tmp_path / "rag.yml"
     path.write_text("prompt:\n  system_instructions: 'Be terse.'\n")
     assert load_config(path).prompt.system_instructions == "Be terse."
+
+
+def test_eval_config_has_default_abstention_markers() -> None:
+    markers = Config().eval.abstention_markers
+    assert any("don't know" in m or "does not contain" in m for m in markers)
+
+
+def test_eval_config_gates_default_empty() -> None:
+    assert Config().eval.gates == {}
+
+
+def test_eval_config_rejects_negative_gate_threshold() -> None:
+    with pytest.raises(ValidationError):
+        Config(eval={"gates": {"recall@k": -0.1}})
+
+
+def test_eval_config_rejects_non_finite_gate_threshold() -> None:
+    with pytest.raises(ValidationError):
+        Config(eval={"gates": {"recall@k": float("inf")}})
