@@ -1,9 +1,8 @@
 import math
-import re
-import statistics
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rag_lab.eval.aggregate import aggregate_metrics
 from rag_lab.eval.runner import EvalResult
 
 
@@ -13,15 +12,15 @@ class MarkdownReporter:
         results: list[EvalResult],
         config_summary: str,
         out_path: Path,
-        previous_report: Path | None = None,
+        previous_run: Path | None = None,
     ) -> None:
-        out_path.write_text(self._render(results, config_summary, previous_report))
+        out_path.write_text(self._render(results, config_summary, previous_run))
 
     def _render(
         self,
         results: list[EvalResult],
         config_summary: str,
-        previous_report: Path | None,
+        previous_run: Path | None,
     ) -> str:
         aggregates = self._aggregates(results)
         lines: list[str] = []
@@ -40,10 +39,16 @@ class MarkdownReporter:
             lines.append(f"| {k} | {v:.2f} |")
         lines.append("")
 
-        if previous_report is not None and previous_report.exists():
-            prev = self._parse_aggregates(previous_report.read_text())
+        if previous_run is not None and previous_run.exists():
+            from rag_lab.eval.run_artifact import read_run
+
+            try:
+                data = read_run(previous_run)
+                prev = data.get("aggregates", {}) if isinstance(data, dict) else {}
+            except (OSError, ValueError):
+                prev = {}
             if prev:
-                lines.append(f"## Diff vs `{previous_report.name}`")
+                lines.append(f"## Diff vs `{previous_run.name}`")
                 lines.append("")
                 lines.append("| metric | previous | current | delta |")
                 lines.append("|---|---|---|---|")
@@ -85,29 +90,4 @@ class MarkdownReporter:
         return "\n".join(lines)
 
     def _aggregates(self, results: list[EvalResult]) -> dict[str, float]:
-        if not results:
-            return {}
-        agg = {
-            "recall@k": statistics.mean(r.recall_at_k for r in results),
-            "ndcg@k": statistics.mean(r.ndcg_at_k for r in results),
-            "map": statistics.mean(r.average_precision for r in results),
-            "mrr": statistics.mean(r.mrr for r in results),
-            "keyword_coverage": statistics.mean(r.keyword_coverage for r in results),
-        }
-        cited = [r.citation_validity for r in results if r.citation_validity is not None]
-        if cited:
-            agg["citation_validity"] = statistics.mean(cited)
-        for key in sorted({k for r in results for k in r.deepeval_scores}):
-            vals = [
-                r.deepeval_scores[key]
-                for r in results
-                if key in r.deepeval_scores and not math.isnan(r.deepeval_scores[key])
-            ]
-            if vals:
-                agg[key] = statistics.mean(vals)
-        return agg
-
-    @staticmethod
-    def _parse_aggregates(content: str) -> dict[str, float]:
-        rows = re.findall(r"^\|\s*([\w@]+)\s*\|\s*([0-9.]+)\s*\|\s*$", content, re.MULTILINE)
-        return {name: float(value) for name, value in rows}
+        return aggregate_metrics(results)
