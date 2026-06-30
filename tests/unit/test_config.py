@@ -95,3 +95,13 @@ def test_eval_config_has_default_abstention_markers() -> None:
 
 def test_eval_config_gates_default_empty() -> None:
     assert Config().eval.gates == {}
+
+
+def test_eval_config_rejects_negative_gate_threshold() -> None:
+    with pytest.raises(ValidationError):
+        Config(eval={"gates": {"recall@k": -0.1}})
+
+
+def test_eval_config_rejects_non_finite_gate_threshold() -> None:
+    with pytest.raises(ValidationError):
+        Config(eval={"gates": {"recall@k": float("inf")}})

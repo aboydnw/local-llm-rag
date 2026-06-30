@@ -94,3 +94,65 @@ def test_eval_exits_2_when_gate_regresses(tmp_path: Path, monkeypatch) -> None:
     )
     assert result.exit_code == 2
     assert (tmp_path / "report.md").exists()  # the gate runs after the report is written
+
+
+def _gated_config(tmp_path: Path) -> Path:
+    config = tmp_path / "rag.yml"
+    write_default_config(config)
+    config.write_text(
+        config.read_text(encoding="utf-8") + "\neval:\n  gates:\n    recall@k: 0.05\n",
+        encoding="utf-8",
+    )
+    return config
+
+
+def _monkeypatch_runner(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "rag_lab.cli.EvalRunner.run",
+        lambda self, items: [EvalResult(item_id="q1", question="hi", actual_answer="a",
+                                        recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0)],
+    )
+
+
+def test_eval_exits_1_when_baseline_is_unreadable(tmp_path: Path, monkeypatch) -> None:
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    bad = tmp_path / "baseline.json"
+    bad.write_text("not a run.json\n", encoding="utf-8")
+    _monkeypatch_runner(monkeypatch)
+
+    result = runner.invoke(
+        app,
+        ["eval", "--config", str(config), "--db", str(db), "--golden", str(golden),
+         "--baseline", str(bad), "--report", str(tmp_path / "report.md")],
+    )
+    assert result.exit_code == 1
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+    assert (tmp_path / "report.md").exists()  # failed at the gate, not before the run
+
+
+def test_eval_exits_1_when_baseline_k_differs(tmp_path: Path, monkeypatch) -> None:
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    baseline = tmp_path / "baseline.json"
+    write_run(
+        baseline,
+        [EvalResult(item_id="q1", question="hi", actual_answer="a",
+                    recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0)],
+        config_summary="cfg", prompt_version="0000", k=99, created_at="2026-06-29T00:00:00Z",
+    )
+    _monkeypatch_runner(monkeypatch)
+
+    result = runner.invoke(
+        app,
+        ["eval", "--config", str(config), "--db", str(db), "--golden", str(golden),
+         "--baseline", str(baseline), "--report", str(tmp_path / "report.md")],
+    )
+    assert result.exit_code == 1
+    assert (tmp_path / "report.md").exists()

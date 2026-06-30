@@ -288,7 +288,23 @@ def eval(  # noqa: A001
     typer.echo(f"Run artifact written to {report.parent / 'run.json'}")
 
     if baseline is not None and cfg.eval.gates:
-        prev = read_run(baseline).get("aggregates", {})
+        try:
+            baseline_run = read_run(baseline)
+        except (OSError, ValueError) as exc:
+            typer.echo(f"Baseline run artifact is unreadable: {baseline}", err=True)
+            raise typer.Exit(code=1) from exc
+        if not isinstance(baseline_run, dict):
+            typer.echo(f"Baseline run artifact is not a run.json: {baseline}", err=True)
+            raise typer.Exit(code=1)
+        if baseline_run.get("k") != cfg.retriever.k:
+            typer.echo(
+                f"Baseline was built with k={baseline_run.get('k')} but this run uses "
+                f"k={cfg.retriever.k}; recall@k/ndcg@k are not comparable. "
+                "Rebuild the baseline or align k.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        prev = baseline_run.get("aggregates", {})
         failures = gate_failures(aggregate_metrics(results), prev, cfg.eval.gates)
         if failures:
             typer.echo("Regression gate failed:", err=True)
