@@ -42,7 +42,11 @@ class MarkdownReporter:
         if previous_run is not None and previous_run.exists():
             from rag_lab.eval.run_artifact import read_run
 
-            prev = read_run(previous_run).get("aggregates", {})
+            try:
+                data = read_run(previous_run)
+                prev = data.get("aggregates", {}) if isinstance(data, dict) else {}
+            except (OSError, ValueError):
+                prev = {}
             if prev:
                 lines.append(f"## Diff vs `{previous_run.name}`")
                 lines.append("")

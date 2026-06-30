@@ -9,6 +9,24 @@ def test_prompt_version_is_stable_short_hash() -> None:
     assert len(prompt_version("hello")) == 8
 
 
+def test_write_run_normalizes_nan_scores_to_null(tmp_path: Path) -> None:
+    results = [
+        EvalResult(
+            item_id="x", question="q", actual_answer="a",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            deepeval_scores={"faithfulness": float("nan")},
+        )
+    ]
+    path = tmp_path / "run.json"
+    write_run(
+        path, results,
+        config_summary="cfg", prompt_version="0000", k=5, created_at="2026-06-29T00:00:00Z",
+    )
+    assert "NaN" not in path.read_text(encoding="utf-8")
+    data = read_run(path)
+    assert data["items"][0]["deepeval_scores"]["faithfulness"] is None
+
+
 def test_write_run_then_read_round_trips(tmp_path: Path) -> None:
     results = [
         EvalResult(

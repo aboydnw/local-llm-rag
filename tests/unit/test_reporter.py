@@ -64,6 +64,21 @@ def _result_with(recall: float) -> EvalResult:
     )
 
 
+def test_report_skips_diff_when_previous_run_is_not_a_valid_artifact(tmp_path: Path) -> None:
+    bad = tmp_path / "previous.md"
+    bad.write_text("# not a run.json\n", encoding="utf-8")
+    out_path = tmp_path / "report.md"
+    MarkdownReporter().write(
+        results=[_result_with(recall=1.0)],
+        config_summary="cfg",
+        out_path=out_path,
+        previous_run=bad,
+    )
+    content = out_path.read_text()
+    assert "Diff vs" not in content
+    assert "recall@k" in content
+
+
 def test_report_diffs_against_previous_run_json(tmp_path: Path) -> None:
     from rag_lab.eval.run_artifact import write_run
 

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 from dataclasses import asdict
 from pathlib import Path
 
@@ -11,6 +12,16 @@ SCHEMA_VERSION = 1
 
 def prompt_version(instructions: str) -> str:
     return hashlib.sha256(instructions.encode("utf-8")).hexdigest()[:8]
+
+
+def _json_safe(value: object) -> object:
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(v) for v in value]
+    return value
 
 
 def write_run(
@@ -28,10 +39,10 @@ def write_run(
         "config_summary": config_summary,
         "prompt_version": prompt_version,
         "k": k,
-        "aggregates": aggregate_metrics(results),
-        "items": [asdict(r) for r in results],
+        "aggregates": _json_safe(aggregate_metrics(results)),
+        "items": [_json_safe(asdict(r)) for r in results],
     }
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8")
 
 
 def read_run(path: Path) -> dict:
