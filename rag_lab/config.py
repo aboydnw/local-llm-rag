@@ -36,6 +36,16 @@ class RetrieverConfig(BaseModel):
 class EvalConfig(BaseModel):
     deepeval: bool = False
     deepeval_model: str | None = None
+    abstention_markers: list[str] = Field(
+        default_factory=lambda: [
+            "i don't know",
+            "i do not know",
+            "does not contain",
+            "cannot answer",
+            "no information",
+        ]
+    )
+    gates: dict[str, float] = Field(default_factory=dict)
 
 
 class PromptConfig(BaseModel):

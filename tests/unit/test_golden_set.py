@@ -53,3 +53,17 @@ def test_load_rejects_duplicate_ids(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError):
         load_golden_set(path)
+
+
+def test_golden_item_defaults_expect_abstention_false(tmp_path) -> None:
+    path = tmp_path / "golden.yml"
+    path.write_text("- id: q1\n  question: hi\n", encoding="utf-8")
+    items = load_golden_set(path)
+    assert items[0].expect_abstention is False
+
+
+def test_golden_item_reads_expect_abstention(tmp_path) -> None:
+    path = tmp_path / "golden.yml"
+    path.write_text("- id: q1\n  question: hi\n  expect_abstention: true\n", encoding="utf-8")
+    items = load_golden_set(path)
+    assert items[0].expect_abstention is True
