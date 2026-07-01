@@ -3,6 +3,7 @@ from pathlib import Path
 import streamlit as st
 import yaml
 
+from rag_lab.agent.agent import DEFAULT_AGENT_INSTRUCTIONS
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config, config_summary
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 from rag_lab.studio import corpora as corpora_mod
@@ -123,6 +124,46 @@ def render(session) -> Config:
         "k", 1, 20, cfg.retriever.k,
         help="How many chunks to retrieve and feed to the LLM for each question.",
     )
+
+    st.sidebar.header("Agent  🟢 cheap")
+    cfg.agent.enabled = st.sidebar.toggle(
+        "agentic retrieval", value=cfg.agent.enabled,
+        help="Let the LLM orchestrate retrieval itself: it picks tools (vector, "
+        "keyword, list, fetch) step by step instead of one fixed retrieval. "
+        "Slower — several LLM calls per question — but you can watch it reason.",
+    )
+    if cfg.agent.enabled:
+        cfg.agent.max_steps = st.sidebar.slider(
+            "max_steps", 1, 12, cfg.agent.max_steps,
+            help="Hard cap on reasoning steps before the agent must answer with "
+            "whatever it has gathered. Bounds cost and prevents loops.",
+        )
+        cfg.agent.final_k = st.sidebar.slider(
+            "final_k", 1, 20, cfg.agent.final_k,
+            help="How many gathered chunks survive to the final answer prompt.",
+        )
+        all_tools = [
+            "vector_search", "keyword_search", "list_documents", "fetch_document",
+        ]
+        chosen = st.sidebar.multiselect(
+            "tools", all_tools, default=list(cfg.agent.tools),
+            help="Which tools the agent may call. Try removing one and watch how "
+            "its strategy changes.",
+        )
+        cfg.agent.tools = chosen or ["vector_search"]
+
+        def _reset_agent_prompt() -> None:
+            st.session_state["agent_instructions"] = DEFAULT_AGENT_INSTRUCTIONS
+
+        if "agent_instructions" not in st.session_state:
+            st.session_state["agent_instructions"] = cfg.agent.instructions
+        cfg.agent.instructions = st.sidebar.text_area(
+            "Agent prompt (ReAct instructions)",
+            key="agent_instructions", height=160,
+            help="The instructions that teach the model the Thought/Action/"
+            "Observation loop. Edit to change how the agent reasons.",
+        )
+        st.sidebar.button("Reset agent prompt", on_click=_reset_agent_prompt)
 
     st.sidebar.header("Models")
     if ollama_error is not None:
