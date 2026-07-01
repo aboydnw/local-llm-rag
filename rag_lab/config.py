@@ -54,6 +54,7 @@ class AgentConfig(BaseModel):
             "fetch_document",
         ]
     ] = Field(
+        min_length=1,
         default_factory=lambda: [
             "vector_search",
             "keyword_search",

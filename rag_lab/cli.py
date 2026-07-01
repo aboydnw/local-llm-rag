@@ -178,6 +178,8 @@ def ask(
     _require_compatible_index(store, cfg, force)
     embedder = pipeline.build_embedder(cfg)
     if use_agent or cfg.agent.enabled:
+        if k:
+            cfg.retriever.k = k
         _run_agent(question, store, embedder, cfg, show_trace)
         return
     retriever = pipeline.build_retriever(store, embedder, cfg)

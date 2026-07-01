@@ -8,6 +8,13 @@ from rag_lab.config import Config, load_config, write_default_config
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
 
+def test_agent_config_rejects_empty_tools() -> None:
+    from rag_lab.config import AgentConfig
+
+    with pytest.raises(ValidationError):
+        AgentConfig(tools=[])
+
+
 def test_load_config_parses_yaml(tmp_path: Path) -> None:
     cfg_path = tmp_path / "rag.yml"
     cfg_path.write_text(

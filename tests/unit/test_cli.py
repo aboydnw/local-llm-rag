@@ -83,6 +83,41 @@ def test_ask_agent_flag_runs_agent(tmp_path: Path, monkeypatch) -> None:
     assert "docs/a.md" in result.output
 
 
+def test_ask_agent_applies_k_override(tmp_path: Path, monkeypatch) -> None:
+    from rag_lab.agent.agent import AgentResult
+
+    config = tmp_path / "rag.yml"
+    write_default_config(config)
+    db = tmp_path / "rag.db"
+    store = SqliteVecStore(db, dimension=768)
+    store.initialize()
+    store.write_manifest(
+        {"schema_version": 1, "embedder_model": "nomic-embed-text", "dimension": 768}
+    )
+
+    captured = {}
+
+    class _FakeAgent:
+        def run(self, question: str) -> AgentResult:
+            return AgentResult(
+                answer="a", steps=[], chunks_seen=[], final_context=[]
+            )
+
+    def _fake_build_agent(store, embedder, cfg):
+        captured["k"] = cfg.retriever.k
+        return _FakeAgent()
+
+    monkeypatch.setattr("rag_lab.pipeline.build_embedder", lambda cfg: object())
+    monkeypatch.setattr("rag_lab.pipeline.build_agent", _fake_build_agent)
+
+    result = runner.invoke(
+        app,
+        ["ask", "hi", "--config", str(config), "--db", str(db), "--agent", "--k", "9"],
+    )
+    assert result.exit_code == 0
+    assert captured["k"] == 9
+
+
 def test_eval_refuses_when_index_embedder_mismatches_config(tmp_path: Path) -> None:
     config = tmp_path / "rag.yml"
     write_default_config(config)
