@@ -118,6 +118,31 @@ def ingest(
             workdir.cleanup()
 
 
+def _run_agent(
+    question: str,
+    store,
+    embedder,
+    cfg: config_mod.Config,
+    show_trace: bool,
+) -> None:
+    agent = pipeline.build_agent(store, embedder, cfg)
+    result = agent.run(question)
+    if show_trace:
+        typer.echo("--- Agent trace ---")
+        for step in result.steps:
+            if step.action is None:
+                continue
+            typer.echo(f"Thought: {step.thought}")
+            typer.echo(f"Action: {step.action} — {step.action_input}")
+            typer.echo(f"Observation: {step.observation}")
+            typer.echo("")
+    typer.echo(result.answer)
+    typer.echo("")
+    typer.echo("--- Sources ---")
+    for i, chunk in enumerate(result.final_context, start=1):
+        typer.echo(f"[{i}] {chunk.doc_path} — {' > '.join(chunk.heading_path)}")
+
+
 @app.command()
 def ask(
     question: str = typer.Argument(..., help="Your question."),
@@ -129,6 +154,12 @@ def ask(
     ),
     force: bool = typer.Option(
         False, "--force", help="Query even if the index was built with a different config."
+    ),
+    use_agent: bool = typer.Option(
+        False, "--agent", help="Let the LLM orchestrate retrieval tools (agentic mode)."
+    ),
+    show_trace: bool = typer.Option(
+        False, "--show-trace", help="Print the agent's reasoning trace (agent mode only)."
     ),
 ) -> None:
     """Ask a question against an ingested corpus."""
@@ -146,6 +177,9 @@ def ask(
     store = pipeline.build_store(cfg, db)
     _require_compatible_index(store, cfg, force)
     embedder = pipeline.build_embedder(cfg)
+    if use_agent or cfg.agent.enabled:
+        _run_agent(question, store, embedder, cfg, show_trace)
+        return
     retriever = pipeline.build_retriever(store, embedder, cfg)
     llm = pipeline.build_llm(cfg)
     builder = pipeline.build_prompt_builder(cfg)
