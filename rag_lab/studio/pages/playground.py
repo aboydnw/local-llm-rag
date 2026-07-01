@@ -34,11 +34,20 @@ def render() -> None:
     if not question:
         return
 
+    try:
+        db_path = indexer_mod.ensure_index(ws, corpus, cfg)
+        embedder = components.build_embedder(cfg)
+        store = SqliteVecStore(db_path, dimension=embedder.dimension)
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Index setup failed: {exc}")
+        return
+
+    if cfg.agent.enabled:
+        _render_agent_run(store, embedder, cfg, question)
+        return
+
     with st.spinner("Retrieving..."):
         try:
-            db_path = indexer_mod.ensure_index(ws, corpus, cfg)
-            embedder = components.build_embedder(cfg)
-            store = SqliteVecStore(db_path, dimension=embedder.dimension)
             retriever = components.build_retriever(store, embedder, cfg)
             results = retriever.retrieve(question, k=cfg.retriever.k)
             prompt = PromptBuilder(
@@ -64,3 +73,38 @@ def render() -> None:
     st.divider()
     with st.expander("📋 Copy as markdown"):
         st.code(share_mod.format_run_markdown(question, answer, results), language="markdown")
+
+
+def _render_agent_run(store, embedder, cfg, question: str) -> None:
+    """Run the retrieval agent and render its trace, answer, and final context."""
+    with st.spinner("Agent reasoning..."):
+        try:
+            agent = components.build_agent(store, embedder, cfg)
+            result = agent.run(question)
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Agent run failed: {exc}")
+            return
+
+    st.subheader("Agent trace")
+    tool_calls = len([s for s in result.steps if s.action])
+    st.caption(
+        f"{result.llm_calls} LLM calls · {tool_calls} tool calls · "
+        f"{len(result.chunks_seen)} chunks seen → {len(result.final_context)} used"
+    )
+    for i, step in enumerate(result.steps, start=1):
+        if step.action is None:
+            st.markdown(f"**{i}. Ready to answer** — {step.thought}")
+            continue
+        with st.expander(f"{i}. {step.action}: {step.action_input}"):
+            if step.thought:
+                st.markdown(f"**Thought:** {step.thought}")
+            st.text((step.observation or "")[:2000])
+
+    st.subheader("Answer")
+    st.write(result.answer)
+
+    st.subheader("Final context (what the answer cites)")
+    for i, chunk in enumerate(result.final_context, start=1):
+        heading = " > ".join(chunk.heading_path) or "(no heading)"
+        with st.expander(f"[{i}] {chunk.doc_path} — {heading}"):
+            st.text(chunk.text[:1000])
