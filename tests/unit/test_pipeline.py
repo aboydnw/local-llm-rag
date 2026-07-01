@@ -65,6 +65,38 @@ def test_build_retriever_wraps_with_reranker_when_configured(tmp_path: Path) -> 
     assert isinstance(retriever, RerankingRetriever)
 
 
+def test_build_agent_returns_agent_with_configured_tools(tmp_path: Path) -> None:
+    from rag_lab.agent.agent import Agent
+
+    config = Config()
+    agent = pipeline.build_agent(_store(tmp_path), FakeEmbedder(16), config)
+    assert isinstance(agent, Agent)
+    assert [t.name for t in agent.tools] == [
+        "vector_search",
+        "keyword_search",
+        "list_documents",
+        "fetch_document",
+    ]
+    assert agent.max_steps == 6
+    assert agent.final_k == 5
+
+
+def test_build_agent_honors_tool_subset(tmp_path: Path) -> None:
+    config = Config()
+    config.agent.tools = ["vector_search"]
+    agent = pipeline.build_agent(_store(tmp_path), FakeEmbedder(16), config)
+    assert [t.name for t in agent.tools] == ["vector_search"]
+
+
+def test_build_agent_rejects_unknown_tool(tmp_path: Path) -> None:
+    import pytest
+
+    config = Config()
+    config.agent.tools = ["bogus_tool"]
+    with pytest.raises(ValueError):
+        pipeline.build_agent(_store(tmp_path), FakeEmbedder(16), config)
+
+
 def _store_with_manifest(tmp_path: Path, config: Config) -> SqliteVecStore:
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()
