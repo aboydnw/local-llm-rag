@@ -124,6 +124,18 @@ def render(session) -> Config:
         "k", 1, 20, cfg.retriever.k,
         help="How many chunks to retrieve and feed to the LLM for each question.",
     )
+    rerankers = ["none", "llm"]
+    cfg.retriever.reranker = st.sidebar.radio(
+        "reranker", rerankers, index=rerankers.index(cfg.retriever.reranker),
+        help="Optional second pass: 'llm' asks the model to reorder a larger candidate "
+        "set down to k by relevance. Costs extra LLM calls; no rebuild needed.",
+    )
+    if cfg.retriever.reranker == "llm":
+        cfg.retriever.rerank_candidates = st.sidebar.number_input(
+            "rerank_candidates", min_value=1, value=cfg.retriever.rerank_candidates,
+            help="How many chunks to fetch before the reranker trims them down to k. "
+            "Bigger = better ordering, more LLM work.",
+        )
 
     st.sidebar.header("Agent  🟢 cheap")
     cfg.agent.enabled = st.sidebar.toggle(
