@@ -92,6 +92,25 @@ def test_agent_dedupes_chunks_seen():
     assert len(result.chunks_seen) == 1
 
 
+def test_agent_survives_nonconsecutive_parse_failures():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "I will just chat.",
+            "Action: vector_search\nAction Input: q",
+            "I will just chat again.",
+            "Thought: done\nFinal Answer",
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool], max_steps=6)
+    result = agent.run("q")
+    assert tool.calls == ["q"]
+    assert result.answer == "answer"
+
+
 def test_agent_final_context_capped_at_final_k():
     chunks = [_chunk(f"c{i}", "d.md", i) for i in range(5)]
     tool = _RecordingTool("vector_search", ToolResult(observation="x", chunks=chunks))

@@ -23,7 +23,7 @@ class ReActParser:
         thought_match = _THOUGHT.search(text)
         thought = thought_match.group(1).strip() if thought_match else ""
 
-        if "Final Answer" in text:
+        if re.search(r"(?:^|\n)\s*Final Answer\b", text):
             return ParsedStep(
                 thought=thought, action=None, action_input="", is_final=True
             )

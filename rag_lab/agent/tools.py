@@ -54,7 +54,10 @@ class SearchTool:
         self.k = k
 
     def run(self, arg: str) -> ToolResult:
-        results = self.retriever.retrieve(arg, k=self.k)
+        try:
+            results = self.retriever.retrieve(arg, k=self.k)
+        except Exception as exc:
+            return ToolResult(observation=f"Error: search failed ({exc}).", chunks=[])
         chunks = [r.chunk for r in results]
         return ToolResult(observation=_format_chunks(chunks), chunks=chunks)
 
@@ -70,7 +73,12 @@ class ListDocumentsTool:
         self.source = source
 
     def run(self, arg: str) -> ToolResult:
-        docs = self.source.list_documents()
+        try:
+            docs = self.source.list_documents()
+        except Exception as exc:
+            return ToolResult(
+                observation=f"Error: could not list documents ({exc}).", chunks=[]
+            )
         observation = "\n".join(docs) if docs else "No documents."
         return ToolResult(observation=observation, chunks=[])
 
@@ -87,7 +95,12 @@ class FetchDocumentTool:
 
     def run(self, arg: str) -> ToolResult:
         path = arg.strip()
-        chunks = self.source.chunks_for_doc(path)
+        try:
+            chunks = self.source.chunks_for_doc(path)
+        except Exception as exc:
+            return ToolResult(
+                observation=f"Error: could not fetch '{path}' ({exc}).", chunks=[]
+            )
         if not chunks:
             return ToolResult(
                 observation=f"Error: no such document '{path}'.", chunks=[]

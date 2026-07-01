@@ -75,3 +75,37 @@ def test_fetch_document_tool_unknown_path_is_recoverable_error():
     result = tool.run("missing.md")
     assert result.chunks == []
     assert result.observation.startswith("Error:")
+
+
+class _BoomRetriever:
+    def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
+        raise RuntimeError("backend down")
+
+
+class _BoomSource:
+    def list_documents(self) -> list[str]:
+        raise RuntimeError("backend down")
+
+    def chunks_for_doc(self, doc_path: str) -> list[Chunk]:
+        raise RuntimeError("backend down")
+
+
+def test_search_tool_backend_error_is_recoverable():
+    tool = SearchTool(name="vector_search", description="...", retriever=_BoomRetriever())
+    result = tool.run("q")
+    assert result.chunks == []
+    assert result.observation.startswith("Error:")
+
+
+def test_list_documents_tool_backend_error_is_recoverable():
+    tool = ListDocumentsTool(_BoomSource())
+    result = tool.run("")
+    assert result.chunks == []
+    assert result.observation.startswith("Error:")
+
+
+def test_fetch_document_tool_backend_error_is_recoverable():
+    tool = FetchDocumentTool(_BoomSource())
+    result = tool.run("g.md")
+    assert result.chunks == []
+    assert result.observation.startswith("Error:")
