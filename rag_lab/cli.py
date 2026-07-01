@@ -125,7 +125,11 @@ def _run_agent(
     cfg: config_mod.Config,
     show_trace: bool,
 ) -> None:
-    agent = pipeline.build_agent(store, embedder, cfg)
+    try:
+        agent = pipeline.build_agent(store, embedder, cfg)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
     result = agent.run(question)
     if show_trace:
         typer.echo("--- Agent trace ---")
