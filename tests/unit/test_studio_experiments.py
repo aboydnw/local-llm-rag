@@ -49,6 +49,40 @@ def _run(tmp_path, run_id, config=None):
     )
 
 
+def test_run_eval_uses_agent_when_enabled(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from rag_lab.agent.agent import AgentResult, AgentStep
+    from rag_lab.types import Chunk
+
+    class _FakeAgent:
+        def run(self, question: str) -> AgentResult:
+            chunk = Chunk(
+                text="tiles", doc_path=Path("a.md"), heading_path=("H",), position=0
+            )
+            return AgentResult(
+                answer="about tiles [1]",
+                steps=[
+                    AgentStep(
+                        thought="t", action="keyword_search",
+                        action_input="q", observation="o", chunks=[chunk],
+                    )
+                ],
+                chunks_seen=[chunk],
+                final_context=[chunk],
+                llm_calls=2,
+            )
+
+    monkeypatch.setattr(
+        "rag_lab.studio.components.build_agent", lambda *a, **k: _FakeAgent()
+    )
+    config = Config()
+    config.agent.enabled = True
+    _, record = _run(tmp_path, "r-agent", config=config)
+    assert record.scores["tool_calls"] == 1.0
+    assert "recall@k_seen" in record.scores
+
+
 def test_aggregate_scores_includes_agent_metrics():
     from rag_lab.eval.runner import EvalResult
 

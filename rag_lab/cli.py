@@ -258,6 +258,11 @@ def eval(  # noqa: A001
     force: bool = typer.Option(
         False, "--force", help="Run even if the index was built with a different config."
     ),
+    use_agent: bool = typer.Option(
+        False,
+        "--agent",
+        help="Evaluate the LLM tool-orchestration agent instead of the fixed retriever.",
+    ),
 ) -> None:
     """Run the eval harness against a golden set and write a markdown report."""
     if not golden.exists():
@@ -290,12 +295,18 @@ def eval(  # noqa: A001
                 err=True,
             )
             raise typer.Exit(code=1) from exc
+    agent = (
+        pipeline.build_agent(store, embedder, cfg)
+        if (use_agent or cfg.agent.enabled)
+        else None
+    )
     runner = EvalRunner(
         retriever=retriever,
         llm=llm,
         k=cfg.retriever.k,
         deepeval_scorer=scorer,
         prompt_builder=pipeline.build_prompt_builder(cfg),
+        agent=agent,
     )
 
     items = golden_set_mod.load_golden_set(golden)

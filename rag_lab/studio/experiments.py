@@ -73,6 +73,10 @@ def run_eval(
     retriever = components.build_retriever(store, embedder, config)
     if llm is None:
         llm = components.build_llm(config)
+    agent = None
+    if config.agent.enabled:
+        agent = components.build_agent(store, embedder, config)
+        agent.llm = llm
     scorer = None
     if config.eval.deepeval:
         from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
@@ -84,6 +88,7 @@ def run_eval(
         k=config.retriever.k,
         deepeval_scorer=scorer,
         prompt_builder=PromptBuilder(system_instructions=config.prompt.system_instructions),
+        agent=agent,
     )
 
     items = golden_set_mod.load_golden_set(golden_path)
