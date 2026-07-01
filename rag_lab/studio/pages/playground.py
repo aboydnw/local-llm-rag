@@ -111,3 +111,13 @@ def _render_agent_run(store, embedder, cfg, question: str) -> None:
         heading = " > ".join(chunk.heading_path) or "(no heading)"
         with st.expander(f"[{i}] {chunk.doc_path} — {heading}"):
             st.text(chunk.text[:1000])
+
+    tools_used = tuple(sorted({s.action for s in result.steps if s.action}))
+    st.divider()
+    with st.expander("📋 Copy as markdown"):
+        st.code(
+            share_mod.format_agent_run_markdown(
+                question, result.answer, result.steps, tools_used, result.final_context
+            ),
+            language="markdown",
+        )
