@@ -271,3 +271,32 @@ class SqliteVecStore:
                 )
                 out.append((chunk, float(distance)))
             return out
+
+    def list_documents(self) -> list[str]:
+        """Distinct document paths in the index, sorted ascending."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT doc_path FROM chunks ORDER BY doc_path"
+            ).fetchall()
+            return [row[0] for row in rows]
+
+    def chunks_for_doc(self, doc_path: str) -> list[Chunk]:
+        """All chunks for one document, ordered by position. Empty if unknown."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT doc_path, heading_path, position, text, metadata "
+                "FROM chunks WHERE doc_path = ? ORDER BY position",
+                (doc_path,),
+            ).fetchall()
+        out: list[Chunk] = []
+        for path, heading_path_json, position, text, metadata_json in rows:
+            out.append(
+                Chunk(
+                    text=text,
+                    doc_path=Path(path),
+                    heading_path=tuple(json.loads(heading_path_json)),
+                    position=position,
+                    metadata=json.loads(metadata_json),
+                )
+            )
+        return out
