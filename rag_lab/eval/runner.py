@@ -2,6 +2,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from rag_lab.agent.agent import trace_dict
 from rag_lab.eval.golden_set import GoldenItem
 from rag_lab.eval.scorers.citation import citation_validity, parse_citations
 from rag_lab.eval.scorers.keyword import keyword_coverage
@@ -37,6 +38,7 @@ class EvalResult:
     deepeval_scores: dict[str, float] = field(default_factory=dict)
     agent_metrics: dict[str, float] = field(default_factory=dict)
     agent_tools_used: tuple[str, ...] = ()
+    agent_trace: list[dict] = field(default_factory=list)
 
 
 class EvalRunner:
@@ -86,6 +88,7 @@ class EvalRunner:
                     "llm_calls": float(agent_result.llm_calls),
                 }
                 agent_tools_used = tuple(sorted({s.action for s in tool_steps}))
+                agent_trace = [trace_dict(s) for s in agent_result.steps]
                 latency_ms = {"agent": (t1 - t0) * 1000.0}
             else:
                 t0 = self.clock()
@@ -98,6 +101,7 @@ class EvalRunner:
                 t2 = self.clock()
                 agent_metrics = {}
                 agent_tools_used = ()
+                agent_trace = []
                 latency_ms = {
                     "retrieve": (t1 - t0) * 1000.0,
                     "generate": (t2 - t1) * 1000.0,
@@ -140,6 +144,7 @@ class EvalRunner:
                     deepeval_scores=deepeval_scores,
                     agent_metrics=agent_metrics,
                     agent_tools_used=agent_tools_used,
+                    agent_trace=agent_trace,
                 )
             )
         return out
