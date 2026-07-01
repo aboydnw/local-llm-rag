@@ -111,6 +111,23 @@ def test_agent_survives_nonconsecutive_parse_failures():
     assert result.answer == "answer"
 
 
+def test_agent_counts_llm_calls_including_retries_and_synthesis():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "I will just chat.",
+            "Action: vector_search\nAction Input: q",
+            "Thought: done\nFinal Answer",
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool], max_steps=6)
+    result = agent.run("q")
+    assert result.llm_calls == 4
+
+
 def test_agent_final_context_capped_at_final_k():
     chunks = [_chunk(f"c{i}", "d.md", i) for i in range(5)]
     tool = _RecordingTool("vector_search", ToolResult(observation="x", chunks=chunks))

@@ -41,6 +41,7 @@ class AgentResult:
     steps: list[AgentStep]
     chunks_seen: list[Chunk]
     final_context: list[Chunk]
+    llm_calls: int = 0
 
 
 def _render_prompt(question: str, tools: list[Tool], scratchpad: str) -> str:
@@ -92,10 +93,12 @@ class Agent:
         steps: list[AgentStep] = []
         seen: list[Chunk] = []
         parse_failures = 0
+        llm_calls = 0
 
         for _ in range(self.max_steps):
             prompt = _render_prompt(question, self.tools, scratchpad)
             text = self.llm.generate(prompt)
+            llm_calls += 1
             try:
                 parsed = self.parser.parse(text)
             except ParseError:
@@ -159,6 +162,7 @@ class Agent:
             steps=steps,
             chunks_seen=chunks_seen,
             final_context=final_context,
+            llm_calls=llm_calls + 1,
         )
 
     def _synthesize(self, question: str, chunks: list[Chunk]) -> str:
