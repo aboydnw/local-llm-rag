@@ -49,6 +49,59 @@ def _run(tmp_path, run_id, config=None):
     )
 
 
+def test_run_eval_uses_agent_when_enabled(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from rag_lab.agent.agent import AgentResult, AgentStep
+    from rag_lab.types import Chunk
+
+    class _FakeAgent:
+        def run(self, question: str) -> AgentResult:
+            chunk = Chunk(
+                text="tiles", doc_path=Path("a.md"), heading_path=("H",), position=0
+            )
+            return AgentResult(
+                answer="about tiles [1]",
+                steps=[
+                    AgentStep(
+                        thought="t", action="keyword_search",
+                        action_input="q", observation="o", chunks=[chunk],
+                    )
+                ],
+                chunks_seen=[chunk],
+                final_context=[chunk],
+                llm_calls=2,
+            )
+
+    monkeypatch.setattr(
+        "rag_lab.studio.components.build_agent", lambda *a, **k: _FakeAgent()
+    )
+    config = Config()
+    config.agent.enabled = True
+    _, record = _run(tmp_path, "r-agent", config=config)
+    assert record.scores["tool_calls"] == 1.0
+    assert "recall@k_seen" in record.scores
+
+
+def test_aggregate_scores_includes_agent_metrics():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            agent_metrics={"tool_calls": 2.0},
+        ),
+        EvalResult(
+            item_id="b", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            agent_metrics={"tool_calls": 4.0},
+        ),
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert scores["tool_calls"] == 3.0
+
+
 def test_run_eval_persists_run(tmp_path):
     ws, record = _run(tmp_path, "r1")
     assert record.run_id == "r1"

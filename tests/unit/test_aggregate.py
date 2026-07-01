@@ -21,3 +21,26 @@ def test_aggregate_metrics_means_each_metric() -> None:
 def test_aggregate_metrics_omits_citation_when_never_cited() -> None:
     agg = aggregate_metrics([_r(1.0, 1.0, 1.0, None)])
     assert "citation_validity" not in agg
+
+
+def _agent_r(agent_metrics: dict[str, float]) -> EvalResult:
+    return EvalResult(
+        item_id="x", question="q", actual_answer="a",
+        recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+        agent_metrics=agent_metrics,
+    )
+
+
+def test_aggregate_includes_mean_agent_metrics() -> None:
+    results = [
+        _agent_r({"tool_calls": 2.0, "recall@k_seen": 1.0}),
+        _agent_r({"tool_calls": 4.0, "recall@k_seen": 0.0}),
+    ]
+    agg = aggregate_metrics(results)
+    assert agg["tool_calls"] == 3.0
+    assert agg["recall@k_seen"] == 0.5
+
+
+def test_aggregate_without_agent_metrics_unchanged() -> None:
+    agg = aggregate_metrics([_agent_r({})])
+    assert "tool_calls" not in agg

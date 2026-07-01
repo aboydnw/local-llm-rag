@@ -171,3 +171,54 @@ def test_runner_without_deepeval_scorer_leaves_scores_empty():
     runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=3)
     results = runner.run(items)
     assert results[0].deepeval_scores == {}
+
+
+def _agent_result():
+    from rag_lab.agent.agent import AgentResult, AgentStep
+
+    good = Chunk(text="the answer", doc_path=Path("docs/right.md"),
+                 heading_path=("H",), position=0)
+    noise = Chunk(text="noise", doc_path=Path("docs/wrong.md"),
+                  heading_path=("H",), position=0)
+    return AgentResult(
+        answer="the answer [1]",
+        steps=[
+            AgentStep(thought="t", action="vector_search",
+                      action_input="q", observation="o", chunks=[noise, good]),
+            AgentStep(thought="done", action=None,
+                      action_input=None, observation=None),
+        ],
+        chunks_seen=[noise, good],
+        final_context=[good],
+        llm_calls=3,
+    )
+
+
+class _FakeAgent:
+    def run(self, question: str):
+        return _agent_result()
+
+
+def test_agent_eval_scores_final_context_and_records_agent_metrics():
+    runner = EvalRunner(
+        retriever=_StubRetriever([]), llm=_StubLLM(), k=5, agent=_FakeAgent()
+    )
+    items = [GoldenItem(id="q1", question="q?", ideal_docs=["docs/right.md"],
+                        must_mention=["answer"])]
+    (res,) = runner.run(items)
+    assert res.recall_at_k == 1.0
+    assert res.actual_answer == "the answer [1]"
+    assert res.agent_metrics["recall@k_seen"] == 1.0
+    assert res.agent_metrics["mrr_seen"] == 0.5
+    assert res.agent_metrics["tool_calls"] == 1.0
+    assert res.agent_metrics["llm_calls"] == 3.0
+    assert res.agent_tools_used == ("vector_search",)
+    assert "agent" in res.latency_ms
+    assert [r.doc_path for r in res.retrieved] == ["docs/right.md"]
+
+
+def test_non_agent_eval_leaves_agent_fields_empty():
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=1)
+    (res,) = runner.run([GoldenItem(id="x", question="q")])
+    assert res.agent_metrics == {}
+    assert res.agent_tools_used == ()

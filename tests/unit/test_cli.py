@@ -162,6 +162,59 @@ def test_eval_refuses_when_index_embedder_mismatches_config(tmp_path: Path) -> N
     assert result.exception is None or isinstance(result.exception, SystemExit)
 
 
+def test_eval_agent_flag_scores_agent_runs(tmp_path: Path, monkeypatch) -> None:
+    from rag_lab.agent.agent import AgentResult, AgentStep
+    from rag_lab.llms.fake import FakeLLM
+    from rag_lab.types import Chunk
+
+    config = tmp_path / "rag.yml"
+    write_default_config(config)
+    golden = tmp_path / "golden.yml"
+    golden.write_text(
+        "- id: q1\n  question: hi\n  ideal_docs: [docs/a.md]\n", encoding="utf-8"
+    )
+    db = tmp_path / "rag.db"
+    store = SqliteVecStore(db, dimension=768)
+    store.initialize()
+    store.write_manifest(
+        {"schema_version": 1, "embedder_model": "nomic-embed-text", "dimension": 768}
+    )
+
+    class _FakeAgent:
+        def run(self, question: str) -> AgentResult:
+            chunk = Chunk(
+                text="c", doc_path=Path("docs/a.md"), heading_path=("H",), position=0
+            )
+            return AgentResult(
+                answer="answer [1]",
+                steps=[
+                    AgentStep(
+                        thought="t", action="vector_search",
+                        action_input="q", observation="o", chunks=[chunk],
+                    )
+                ],
+                chunks_seen=[chunk],
+                final_context=[chunk],
+                llm_calls=2,
+            )
+
+    monkeypatch.setattr("rag_lab.pipeline.build_embedder", lambda cfg: object())
+    monkeypatch.setattr("rag_lab.pipeline.build_llm", lambda cfg: FakeLLM("unused"))
+    monkeypatch.setattr("rag_lab.pipeline.build_agent", lambda *a, **k: _FakeAgent())
+
+    report = tmp_path / "report.md"
+    result = runner.invoke(
+        app,
+        [
+            "eval", "--golden", str(golden), "--config", str(config),
+            "--db", str(db), "--report", str(report), "--agent",
+        ],
+    )
+    assert result.exit_code == 0
+    assert report.exists()
+    assert "tool_calls" in report.read_text()
+
+
 def test_eval_help_documents_previous_run_artifact() -> None:
     result = runner.invoke(app, ["eval", "--help"])
     assert result.exit_code == 0
