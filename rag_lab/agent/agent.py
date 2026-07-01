@@ -7,7 +7,7 @@ from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
 
-_REACT_INSTRUCTIONS = """\
+DEFAULT_AGENT_INSTRUCTIONS = """\
 You are a retrieval agent. Answer the user's question by gathering evidence with the \
 tools below. Work in steps. Each step, output exactly:
 
@@ -33,6 +33,7 @@ class AgentStep:
     action_input: str | None
     observation: str | None
     chunks: list[Chunk] = field(default_factory=list)
+    prompt: str | None = None
 
 
 @dataclass
@@ -42,10 +43,23 @@ class AgentResult:
     chunks_seen: list[Chunk]
     final_context: list[Chunk]
     llm_calls: int = 0
+    synthesis_prompt: str = ""
 
 
-def _render_prompt(question: str, tools: list[Tool], scratchpad: str) -> str:
-    parts = [_REACT_INSTRUCTIONS]
+def trace_dict(step: AgentStep) -> dict[str, str | None]:
+    return {
+        "thought": step.thought,
+        "action": step.action,
+        "action_input": step.action_input,
+        "observation": step.observation,
+        "prompt": step.prompt,
+    }
+
+
+def _render_prompt(
+    question: str, tools: list[Tool], scratchpad: str, instructions: str
+) -> str:
+    parts = [instructions]
     for tool in tools:
         parts.append(f"- {tool.name}: {tool.description}")
     parts.append("")
@@ -75,6 +89,7 @@ class Agent:
         *,
         max_steps: int = 6,
         final_k: int = 5,
+        instructions: str | None = None,
     ) -> None:
         if max_steps <= 0:
             raise ValueError("max_steps must be positive")
@@ -86,6 +101,7 @@ class Agent:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.max_steps = max_steps
         self.final_k = final_k
+        self.instructions = instructions or DEFAULT_AGENT_INSTRUCTIONS
         self.parser = ReActParser()
 
     def run(self, question: str) -> AgentResult:
@@ -96,7 +112,9 @@ class Agent:
         llm_calls = 0
 
         for _ in range(self.max_steps):
-            prompt = _render_prompt(question, self.tools, scratchpad)
+            prompt = _render_prompt(
+                question, self.tools, scratchpad, self.instructions
+            )
             text = self.llm.generate(prompt)
             llm_calls += 1
             try:
@@ -121,6 +139,7 @@ class Agent:
                         action=None,
                         action_input=None,
                         observation=None,
+                        prompt=prompt,
                     )
                 )
                 break
@@ -145,6 +164,7 @@ class Agent:
                     action_input=parsed.action_input,
                     observation=observation,
                     chunks=step_chunks,
+                    prompt=prompt,
                 )
             )
             scratchpad += (
@@ -156,18 +176,19 @@ class Agent:
 
         chunks_seen = _dedupe(seen)
         final_context = chunks_seen[: self.final_k]
-        answer = self._synthesize(question, final_context)
+        answer, synthesis_prompt = self._synthesize(question, final_context)
         return AgentResult(
             answer=answer,
             steps=steps,
             chunks_seen=chunks_seen,
             final_context=final_context,
             llm_calls=llm_calls + 1,
+            synthesis_prompt=synthesis_prompt,
         )
 
-    def _synthesize(self, question: str, chunks: list[Chunk]) -> str:
+    def _synthesize(self, question: str, chunks: list[Chunk]) -> tuple[str, str]:
         results = [
             RetrievalResult(chunk=chunk, score=0.0, source="agent") for chunk in chunks
         ]
         prompt = self.prompt_builder.build(question=question, results=results)
-        return self.llm.generate(prompt)
+        return self.llm.generate(prompt), prompt

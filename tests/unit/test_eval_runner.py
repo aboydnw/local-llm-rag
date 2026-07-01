@@ -222,3 +222,40 @@ def test_non_agent_eval_leaves_agent_fields_empty():
     (res,) = runner.run([GoldenItem(id="x", question="q")])
     assert res.agent_metrics == {}
     assert res.agent_tools_used == ()
+
+
+def test_eval_result_records_agent_trace_for_agent_runs():
+    from rag_lab.agent.agent import AgentResult, AgentStep
+
+    chunk = Chunk(text="tiles", doc_path=Path("a.md"), heading_path=("H",), position=0)
+
+    class _FakeAgent:
+        def run(self, question):
+            return AgentResult(
+                answer="about tiles [1]",
+                steps=[
+                    AgentStep(
+                        thought="t", action="keyword_search", action_input="q",
+                        observation="o", chunks=[chunk], prompt="STEP PROMPT",
+                    )
+                ],
+                chunks_seen=[chunk],
+                final_context=[chunk],
+                llm_calls=2,
+                synthesis_prompt="SYNTH",
+            )
+
+    runner = EvalRunner(retriever=None, llm=None, k=3, agent=_FakeAgent())
+    (result,) = runner.run([GoldenItem(id="q1", question="q")])
+    assert result.agent_trace == [
+        {
+            "thought": "t", "action": "keyword_search", "action_input": "q",
+            "observation": "o", "prompt": "STEP PROMPT",
+        }
+    ]
+
+
+def test_eval_result_agent_trace_empty_for_retriever_runs():
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=1)
+    (result,) = runner.run([GoldenItem(id="q1", question="q")])
+    assert result.agent_trace == []

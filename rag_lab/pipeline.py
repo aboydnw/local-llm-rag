@@ -97,6 +97,7 @@ def build_agent(store: SqliteVecStore, embedder, config: Config) -> Agent:
         prompt_builder=build_prompt_builder(config),
         max_steps=config.agent.max_steps,
         final_k=config.agent.final_k,
+        instructions=config.agent.instructions,
     )
 
 

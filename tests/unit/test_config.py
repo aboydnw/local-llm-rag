@@ -116,6 +116,11 @@ def test_default_config_file_has_agent_section(tmp_path) -> None:
     assert load_config(path).agent.enabled is False
 
 
+def test_agent_config_default_instructions_match_engine():
+    from rag_lab.agent.agent import DEFAULT_AGENT_INSTRUCTIONS
+    assert Config().agent.instructions == DEFAULT_AGENT_INSTRUCTIONS
+
+
 def test_config_summary_mentions_key_knobs():
     summary = config_mod.config_summary(Config())
     assert "markdown_aware" in summary
