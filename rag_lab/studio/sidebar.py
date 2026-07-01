@@ -56,12 +56,7 @@ def render(session) -> Config:
         ).strip()
     else:
         session["corpus_name"] = choice
-    session["golden"] = st.sidebar.text_input(
-        "Golden set",
-        value=session["golden"],
-        help="YAML file of question/expected-answer pairs used to score eval runs. "
-        "Optional — leave as-is if you only want to ask questions.",
-    )
+    st.sidebar.caption(f"Golden set: `{session['golden']}`")
 
     st.sidebar.header("Chunker  🟠 re-index")
     chunker_types = ["markdown_aware", "fixed"]

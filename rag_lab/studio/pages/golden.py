@@ -9,6 +9,11 @@ from rag_lab.studio import golden_io
 def render() -> None:
     """Render the Golden set editor: view, add, edit, and delete golden items."""
     st.title("Golden set")
+    st.session_state["golden"] = st.text_input(
+        "Golden set file",
+        value=st.session_state["golden"],
+        help="YAML file of question/expected-answer pairs used to score eval runs.",
+    )
     path = Path(st.session_state["golden"])
     items = golden_io.load_items(path)
 
