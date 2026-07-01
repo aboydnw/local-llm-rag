@@ -1,11 +1,13 @@
 import streamlit as st
 
+from rag_lab.agent.agent import trace_dict
 from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio import share as share_mod
+from rag_lab.studio import trace_view
 from rag_lab.studio.workspace import Workspace
 
 
@@ -70,6 +72,9 @@ def render() -> None:
         with st.expander(f"[{i}] {r.chunk.doc_path} — {heading}  (score {r.score:.3f})"):
             st.text(r.chunk.text[:1000])
 
+    with st.expander("🧩 Prompt sent to the LLM"):
+        st.code(prompt, language="text")
+
     st.divider()
     with st.expander("📋 Copy as markdown"):
         st.code(share_mod.format_run_markdown(question, answer, results), language="markdown")
@@ -91,17 +96,15 @@ def _render_agent_run(store, embedder, cfg, question: str) -> None:
         f"{result.llm_calls} LLM calls · {tool_calls} tool calls · "
         f"{len(result.chunks_seen)} chunks seen → {len(result.final_context)} used"
     )
-    for i, step in enumerate(result.steps, start=1):
-        if step.action is None:
-            st.markdown(f"**{i}. Ready to answer** — {step.thought}")
-            continue
-        with st.expander(f"{i}. {step.action}: {step.action_input}"):
-            if step.thought:
-                st.markdown(f"**Thought:** {step.thought}")
-            st.text((step.observation or "")[:2000])
+    trace_view.render_steps(
+        [trace_dict(s) for s in result.steps], key_prefix="playground"
+    )
 
     st.subheader("Answer")
     st.write(result.answer)
+
+    with st.expander("🧩 Synthesis prompt (final answer)"):
+        st.code(result.synthesis_prompt, language="text")
 
     st.subheader("Final context (what the answer cites)")
     for i, chunk in enumerate(result.final_context, start=1):
