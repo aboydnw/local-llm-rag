@@ -42,6 +42,27 @@ class PromptConfig(BaseModel):
     system_instructions: str = DEFAULT_SYSTEM_INSTRUCTIONS
 
 
+class AgentConfig(BaseModel):
+    enabled: bool = False
+    max_steps: int = Field(default=6, gt=0)
+    final_k: int = Field(default=5, gt=0)
+    tools: list[
+        Literal[
+            "vector_search",
+            "keyword_search",
+            "list_documents",
+            "fetch_document",
+        ]
+    ] = Field(
+        default_factory=lambda: [
+            "vector_search",
+            "keyword_search",
+            "list_documents",
+            "fetch_document",
+        ]
+    )
+
+
 class Config(BaseModel):
     chunker: ChunkerConfig = ChunkerConfig()
     embedder: EmbedderConfig = EmbedderConfig()
@@ -49,6 +70,7 @@ class Config(BaseModel):
     retriever: RetrieverConfig = RetrieverConfig()
     eval: EvalConfig = EvalConfig()
     prompt: PromptConfig = PromptConfig()
+    agent: AgentConfig = AgentConfig()
 
 
 EMBEDDING_DIMENSIONS: dict[str, int] = {
@@ -97,6 +119,15 @@ retriever:
   rerank_candidates: 30
 eval:
   deepeval: false
+agent:
+  enabled: false
+  max_steps: 6
+  final_k: 5
+  tools:
+    - vector_search
+    - keyword_search
+    - list_documents
+    - fetch_document
 """
 
 

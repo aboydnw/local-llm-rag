@@ -64,6 +64,51 @@ def test_load_config_parses_eval_section(tmp_path: Path) -> None:
     assert cfg.eval.deepeval is True
 
 
+def test_agent_config_defaults_to_disabled():
+    from rag_lab.config import AgentConfig
+    assert AgentConfig().enabled is False
+    assert Config().agent.enabled is False
+    assert Config().agent.max_steps == 6
+    assert Config().agent.final_k == 5
+    assert Config().agent.tools == [
+        "vector_search",
+        "keyword_search",
+        "list_documents",
+        "fetch_document",
+    ]
+
+
+def test_load_config_parses_agent_section(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "rag.yml"
+    cfg_path.write_text(
+        "agent:\n"
+        "  enabled: true\n"
+        "  max_steps: 3\n"
+        "  final_k: 2\n"
+        "  tools:\n"
+        "    - vector_search\n"
+        "    - keyword_search\n"
+    )
+    cfg = load_config(cfg_path)
+    assert cfg.agent.enabled is True
+    assert cfg.agent.max_steps == 3
+    assert cfg.agent.final_k == 2
+    assert cfg.agent.tools == ["vector_search", "keyword_search"]
+
+
+def test_load_config_rejects_unknown_agent_tool(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "rag.yml"
+    cfg_path.write_text("agent:\n  tools:\n    - bogus_tool\n")
+    with pytest.raises(ValidationError):
+        load_config(cfg_path)
+
+
+def test_default_config_file_has_agent_section(tmp_path) -> None:
+    path = tmp_path / "rag.yml"
+    write_default_config(path)
+    assert load_config(path).agent.enabled is False
+
+
 def test_config_summary_mentions_key_knobs():
     summary = config_mod.config_summary(Config())
     assert "markdown_aware" in summary
