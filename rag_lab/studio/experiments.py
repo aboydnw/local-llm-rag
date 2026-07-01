@@ -9,6 +9,8 @@ import yaml
 from rag_lab.config import Config, config_summary
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.reporter import MarkdownReporter
+from rag_lab.eval.run_artifact import prompt_version as artifact_prompt_version
+from rag_lab.eval.run_artifact import read_run, write_run
 from rag_lab.eval.runner import EvalRunner
 from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
@@ -119,6 +121,14 @@ def run_eval(
             indent=2,
         )
     )
+    write_run(
+        run_dir / "items.json",
+        results,
+        config_summary=config_summary(config),
+        prompt_version=artifact_prompt_version(config.prompt.system_instructions),
+        k=config.retriever.k,
+        created_at=created_at,
+    )
     return RunRecord(
         run_id=run_id,
         name=name or run_id,
@@ -159,6 +169,13 @@ def list_runs(workspace: Workspace) -> list[RunRecord]:
 def load_run(workspace: Workspace, run_id: str) -> RunRecord:
     run_json = workspace.run_dir(run_id) / "run.json"
     return _record_from_json(json.loads(run_json.read_text()))
+
+
+def load_run_items(workspace: Workspace, run_id: str) -> list[dict]:
+    items_path = workspace.run_dir(run_id) / "items.json"
+    if not items_path.exists():
+        return []
+    return read_run(items_path)["items"]
 
 
 def rename_run(workspace: Workspace, run_id: str, name: str) -> None:

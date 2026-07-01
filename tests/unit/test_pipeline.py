@@ -88,6 +88,13 @@ def test_build_agent_honors_tool_subset(tmp_path: Path) -> None:
     assert [t.name for t in agent.tools] == ["vector_search"]
 
 
+def test_build_agent_passes_instructions(tmp_path: Path) -> None:
+    config = Config()
+    config.agent.instructions = "DO IT MY WAY"
+    agent = pipeline.build_agent(_store(tmp_path), FakeEmbedder(16), config)
+    assert agent.instructions == "DO IT MY WAY"
+
+
 def test_build_agent_rejects_unknown_tool(tmp_path: Path) -> None:
     import pytest
 

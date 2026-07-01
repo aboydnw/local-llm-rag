@@ -4,6 +4,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, Field
 
+from rag_lab.agent.agent import DEFAULT_AGENT_INSTRUCTIONS
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
 
@@ -46,6 +47,7 @@ class AgentConfig(BaseModel):
     enabled: bool = False
     max_steps: int = Field(default=6, gt=0)
     final_k: int = Field(default=5, gt=0)
+    instructions: str = DEFAULT_AGENT_INSTRUCTIONS
     tools: list[
         Literal[
             "vector_search",

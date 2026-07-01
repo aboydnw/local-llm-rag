@@ -111,6 +111,16 @@ def test_agent_survives_nonconsecutive_parse_failures():
     assert result.answer == "answer"
 
 
+def test_agent_uses_custom_instructions_in_prompt():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(["Thought: done\nFinal Answer", "answer"])
+    agent = Agent(llm=llm, tools=[tool], instructions="CUSTOM AGENT PROMPT")
+    agent.run("q")
+    assert "CUSTOM AGENT PROMPT" in llm.prompts[0]
+
+
 def test_agent_counts_llm_calls_including_retries_and_synthesis():
     tool = _RecordingTool(
         "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
@@ -126,6 +136,38 @@ def test_agent_counts_llm_calls_including_retries_and_synthesis():
     agent = Agent(llm=llm, tools=[tool], max_steps=6)
     result = agent.run("q")
     assert result.llm_calls == 4
+
+
+def test_agent_records_step_prompt_and_synthesis_prompt():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="found", chunks=[_chunk("hit")])
+    )
+    llm = ScriptedLLM(
+        [
+            "Thought: search\nAction: vector_search\nAction Input: my query",
+            "Thought: done\nFinal Answer",
+            "The answer [1].",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool])
+    result = agent.run("a question")
+    assert result.steps[0].prompt == llm.prompts[0]
+    assert "a question" in result.synthesis_prompt
+    assert "hit" in result.synthesis_prompt
+
+
+def test_trace_dict_omits_chunks():
+    from rag_lab.agent.agent import AgentStep, trace_dict
+
+    step = AgentStep(
+        thought="t", action="vector_search", action_input="q",
+        observation="o", chunks=[_chunk("c")], prompt="P",
+    )
+    d = trace_dict(step)
+    assert d == {
+        "thought": "t", "action": "vector_search", "action_input": "q",
+        "observation": "o", "prompt": "P",
+    }
 
 
 def test_agent_final_context_capped_at_final_k():

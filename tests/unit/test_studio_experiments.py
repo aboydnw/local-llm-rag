@@ -111,6 +111,20 @@ def test_run_eval_persists_run(tmp_path):
     assert (ws.run_dir("r1") / "config.yml").exists()
 
 
+def test_run_eval_persists_items_json(tmp_path):
+    ws, _ = _run(tmp_path, "r1")
+    assert (ws.run_dir("r1") / "items.json").exists()
+    items = experiments.load_run_items(ws, "r1")
+    assert items and items[0]["question"] == "What is alpha about?"
+    assert "agent_trace" in items[0]
+
+
+def test_load_run_items_returns_empty_when_absent(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    assert experiments.load_run_items(ws, "missing") == []
+
+
 def test_run_eval_snapshots_corpus_sources(tmp_path):
     import json
 
