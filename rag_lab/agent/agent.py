@@ -33,6 +33,7 @@ class AgentStep:
     action_input: str | None
     observation: str | None
     chunks: list[Chunk] = field(default_factory=list)
+    prompt: str | None = None
 
 
 @dataclass
@@ -42,6 +43,17 @@ class AgentResult:
     chunks_seen: list[Chunk]
     final_context: list[Chunk]
     llm_calls: int = 0
+    synthesis_prompt: str = ""
+
+
+def trace_dict(step: AgentStep) -> dict[str, str | None]:
+    return {
+        "thought": step.thought,
+        "action": step.action,
+        "action_input": step.action_input,
+        "observation": step.observation,
+        "prompt": step.prompt,
+    }
 
 
 def _render_prompt(
@@ -127,6 +139,7 @@ class Agent:
                         action=None,
                         action_input=None,
                         observation=None,
+                        prompt=prompt,
                     )
                 )
                 break
@@ -151,6 +164,7 @@ class Agent:
                     action_input=parsed.action_input,
                     observation=observation,
                     chunks=step_chunks,
+                    prompt=prompt,
                 )
             )
             scratchpad += (
@@ -162,18 +176,19 @@ class Agent:
 
         chunks_seen = _dedupe(seen)
         final_context = chunks_seen[: self.final_k]
-        answer = self._synthesize(question, final_context)
+        answer, synthesis_prompt = self._synthesize(question, final_context)
         return AgentResult(
             answer=answer,
             steps=steps,
             chunks_seen=chunks_seen,
             final_context=final_context,
             llm_calls=llm_calls + 1,
+            synthesis_prompt=synthesis_prompt,
         )
 
-    def _synthesize(self, question: str, chunks: list[Chunk]) -> str:
+    def _synthesize(self, question: str, chunks: list[Chunk]) -> tuple[str, str]:
         results = [
             RetrievalResult(chunk=chunk, score=0.0, source="agent") for chunk in chunks
         ]
         prompt = self.prompt_builder.build(question=question, results=results)
-        return self.llm.generate(prompt)
+        return self.llm.generate(prompt), prompt
