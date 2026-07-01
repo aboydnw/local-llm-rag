@@ -111,6 +111,16 @@ def test_agent_survives_nonconsecutive_parse_failures():
     assert result.answer == "answer"
 
 
+def test_agent_uses_custom_instructions_in_prompt():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(["Thought: done\nFinal Answer", "answer"])
+    agent = Agent(llm=llm, tools=[tool], instructions="CUSTOM AGENT PROMPT")
+    agent.run("q")
+    assert "CUSTOM AGENT PROMPT" in llm.prompts[0]
+
+
 def test_agent_counts_llm_calls_including_retries_and_synthesis():
     tool = _RecordingTool(
         "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])

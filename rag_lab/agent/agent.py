@@ -7,7 +7,7 @@ from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
 
-_REACT_INSTRUCTIONS = """\
+DEFAULT_AGENT_INSTRUCTIONS = """\
 You are a retrieval agent. Answer the user's question by gathering evidence with the \
 tools below. Work in steps. Each step, output exactly:
 
@@ -44,8 +44,10 @@ class AgentResult:
     llm_calls: int = 0
 
 
-def _render_prompt(question: str, tools: list[Tool], scratchpad: str) -> str:
-    parts = [_REACT_INSTRUCTIONS]
+def _render_prompt(
+    question: str, tools: list[Tool], scratchpad: str, instructions: str
+) -> str:
+    parts = [instructions]
     for tool in tools:
         parts.append(f"- {tool.name}: {tool.description}")
     parts.append("")
@@ -75,6 +77,7 @@ class Agent:
         *,
         max_steps: int = 6,
         final_k: int = 5,
+        instructions: str | None = None,
     ) -> None:
         if max_steps <= 0:
             raise ValueError("max_steps must be positive")
@@ -86,6 +89,7 @@ class Agent:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.max_steps = max_steps
         self.final_k = final_k
+        self.instructions = instructions or DEFAULT_AGENT_INSTRUCTIONS
         self.parser = ReActParser()
 
     def run(self, question: str) -> AgentResult:
@@ -96,7 +100,9 @@ class Agent:
         llm_calls = 0
 
         for _ in range(self.max_steps):
-            prompt = _render_prompt(question, self.tools, scratchpad)
+            prompt = _render_prompt(
+                question, self.tools, scratchpad, self.instructions
+            )
             text = self.llm.generate(prompt)
             llm_calls += 1
             try:
