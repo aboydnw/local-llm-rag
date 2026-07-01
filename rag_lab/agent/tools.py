@@ -4,6 +4,15 @@ from typing import Protocol
 from rag_lab.retrievers.base import Retriever
 from rag_lab.types import Chunk
 
+VECTOR_SEARCH_DESCRIPTION = (
+    "Semantic similarity search. Input: a natural-language query. "
+    "Best for conceptual or paraphrased questions."
+)
+KEYWORD_SEARCH_DESCRIPTION = (
+    "Exact keyword (BM25) search. Input: keywords. "
+    "Best for API names, error codes, and rare terms."
+)
+
 
 @dataclass(frozen=True)
 class ToolResult:
