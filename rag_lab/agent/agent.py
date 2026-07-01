@@ -109,6 +109,8 @@ class Agent:
                 scratchpad += f"\n{reminder}\n"
                 continue
 
+            parse_failures = 0
+
             if parsed.is_final:
                 steps.append(
                     AgentStep(

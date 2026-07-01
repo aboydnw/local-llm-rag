@@ -26,6 +26,16 @@ def test_multiline_action_input_is_captured():
     assert step.action_input == "docs/guide.md"
 
 
+def test_final_answer_mention_in_thought_does_not_end_step():
+    text = (
+        "Thought: I don't have a final answer yet, let me search.\n"
+        "Action: vector_search\nAction Input: q"
+    )
+    step = ReActParser().parse(text)
+    assert step.is_final is False
+    assert step.action == "vector_search"
+
+
 def test_unparseable_text_raises():
     with pytest.raises(ParseError):
         ReActParser().parse("I will just chat without any action.")
