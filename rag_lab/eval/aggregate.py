@@ -25,4 +25,8 @@ def aggregate_metrics(results: list[EvalResult]) -> dict[str, float]:
         ]
         if vals:
             agg[key] = statistics.mean(vals)
+    for key in sorted({k for r in results for k in r.agent_metrics}):
+        vals = [r.agent_metrics[key] for r in results if key in r.agent_metrics]
+        if vals:
+            agg[key] = statistics.mean(vals)
     return agg

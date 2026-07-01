@@ -44,6 +44,10 @@ def _aggregate_scores(results) -> dict[str, float]:
         ]
         if vals:
             scores[key] = statistics.mean(vals)
+    for key in sorted({k for r in results for k in r.agent_metrics}):
+        vals = [r.agent_metrics[key] for r in results if key in r.agent_metrics]
+        if vals:
+            scores[key] = statistics.mean(vals)
     return scores
 
 

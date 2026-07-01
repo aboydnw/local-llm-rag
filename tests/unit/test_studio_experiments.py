@@ -49,6 +49,25 @@ def _run(tmp_path, run_id, config=None):
     )
 
 
+def test_aggregate_scores_includes_agent_metrics():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            agent_metrics={"tool_calls": 2.0},
+        ),
+        EvalResult(
+            item_id="b", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            agent_metrics={"tool_calls": 4.0},
+        ),
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert scores["tool_calls"] == 3.0
+
+
 def test_run_eval_persists_run(tmp_path):
     ws, record = _run(tmp_path, "r1")
     assert record.run_id == "r1"
