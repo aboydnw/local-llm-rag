@@ -4,9 +4,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from rag_lab.studio import config_panel
+from rag_lab.studio import config_panel, experiments
 from rag_lab.studio import corpora as corpora_mod
-from rag_lab.studio import experiments
+from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.workspace import Workspace
 
 
@@ -20,6 +20,10 @@ def render() -> None:
         ws, st.session_state.get("corpus_name"), st.session_state["corpus"]
     )
     golden = Path(st.session_state["golden"])
+
+    if indexer_mod.status(ws, corpus, cfg).needs_build:
+        st.warning("This corpus isn't built yet — build it on the **Corpus** page.")
+        return
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
     cfg.eval.deepeval = st.checkbox(
