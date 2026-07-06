@@ -2,36 +2,31 @@ from rag_lab.config import Config
 from rag_lab.studio import config_logic
 
 
-def test_retrieval_method_reads_retriever_type_when_agent_off():
+def test_search_mode_direct_when_agent_off():
     cfg = Config()
     cfg.agent.enabled = False
-    cfg.retriever.type = "bm25"
-    assert config_logic.retrieval_method(cfg) == "bm25"
+    assert config_logic.search_mode(cfg) == "direct"
 
 
-def test_retrieval_method_is_agent_when_enabled():
+def test_search_mode_agentic_when_agent_on():
     cfg = Config()
     cfg.agent.enabled = True
-    cfg.retriever.type = "hybrid"
-    assert config_logic.retrieval_method(cfg) == "agent"
+    assert config_logic.search_mode(cfg) == "agentic"
 
 
-def test_apply_agent_method_enables_agent():
+def test_apply_agentic_enables_agent():
     cfg = Config()
-    config_logic.apply_retrieval_method(cfg, "agent")
+    config_logic.apply_search_mode(cfg, "agentic")
     assert cfg.agent.enabled is True
 
 
-def test_apply_non_agent_method_sets_type_and_disables_agent():
+def test_apply_direct_disables_agent_and_sets_hybrid():
     cfg = Config()
     cfg.agent.enabled = True
-    config_logic.apply_retrieval_method(cfg, "vector")
+    cfg.retriever.type = "vector"
+    config_logic.apply_search_mode(cfg, "direct")
     assert cfg.agent.enabled is False
-    assert cfg.retriever.type == "vector"
-
-
-def test_retrieval_methods_constant():
-    assert config_logic.RETRIEVAL_METHODS == ["vector", "bm25", "hybrid", "agent"]
+    assert cfg.retriever.type == "hybrid"
 
 
 def test_llm_model_options_appends_current_and_sentinel():

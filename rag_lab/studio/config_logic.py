@@ -1,25 +1,22 @@
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config
 from rag_lab.studio import models as models_mod
 
-RETRIEVAL_METHODS: list[str] = ["vector", "bm25", "hybrid", "agent"]
 PULL_SENTINEL: str = "➕ Pull another model…"
 ADD_CORPUS_SENTINEL: str = "➕ Add corpus…"
 
 
-def retrieval_method(config: Config) -> str:
-    """Return the active retrieval method: a retriever type, or 'agent' when agentic mode is on."""
-    if config.agent.enabled:
-        return "agent"
-    return config.retriever.type
+def search_mode(config: Config) -> str:
+    """Return the active search mode: 'agentic' when agent mode is on, else 'direct'."""
+    return "agentic" if config.agent.enabled else "direct"
 
 
-def apply_retrieval_method(config: Config, method: str) -> None:
-    """Write a chosen retrieval method back onto the config, toggling agent mode as needed."""
-    if method == "agent":
+def apply_search_mode(config: Config, mode: str) -> None:
+    """Apply a chosen search mode. Direct always uses the hybrid retriever (a v↔k slider)."""
+    if mode == "agentic":
         config.agent.enabled = True
     else:
         config.agent.enabled = False
-        config.retriever.type = method
+        config.retriever.type = "hybrid"
 
 
 def llm_model_options(installed: list[str], current: str) -> list[str]:
