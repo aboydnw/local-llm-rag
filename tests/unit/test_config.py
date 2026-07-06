@@ -158,3 +158,18 @@ def test_load_config_reads_custom_prompt(tmp_path):
     path = tmp_path / "rag.yml"
     path.write_text("prompt:\n  system_instructions: 'Be terse.'\n")
     assert load_config(path).prompt.system_instructions == "Be terse."
+
+
+def test_chunker_config_accepts_recursive_and_semantic_types():
+    from rag_lab.config import ChunkerConfig
+
+    assert ChunkerConfig(type="recursive").type == "recursive"
+    assert ChunkerConfig(type="semantic").type == "semantic"
+
+
+def test_chunker_config_similarity_threshold_defaults_and_bounds():
+    from rag_lab.config import ChunkerConfig
+
+    assert ChunkerConfig().similarity_threshold == 0.75
+    with pytest.raises(ValidationError):
+        ChunkerConfig(similarity_threshold=1.5)

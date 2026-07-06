@@ -9,10 +9,11 @@ from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
 
 class ChunkerConfig(BaseModel):
-    type: Literal["markdown_aware", "fixed"] = "markdown_aware"
+    type: Literal["markdown_aware", "fixed", "recursive", "semantic"] = "markdown_aware"
     max_tokens: int = Field(default=512, gt=0)
     overlap: int = Field(default=50, ge=0)
     context_header: bool = True
+    similarity_threshold: float = Field(default=0.75, ge=0, le=1)
 
 
 class EmbedderConfig(BaseModel):
