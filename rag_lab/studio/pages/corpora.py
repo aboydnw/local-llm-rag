@@ -1,7 +1,10 @@
 import streamlit as st
 
+from rag_lab.config import EMBEDDING_DIMENSIONS
+from rag_lab.studio import config_logic
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio import models as models_mod
 from rag_lab.studio.corpora import Corpus, Source
 from rag_lab.studio.workspace import Workspace
 
@@ -95,6 +98,36 @@ def render() -> None:
                 ),
             )
             st.rerun()
+
+    with st.expander("⚙️ Build settings (chunker + embedder)"):
+        chunker_types = ["markdown_aware", "fixed"]
+        cfg.chunker.type = st.selectbox(
+            "chunker type", chunker_types, index=chunker_types.index(cfg.chunker.type),
+            help="'markdown_aware' splits on headings; 'fixed' splits on a flat token count.",
+        )
+        cfg.chunker.max_tokens = st.slider(
+            "max_tokens", 64, 2048, cfg.chunker.max_tokens, 32,
+            help="Largest chunk size, in tokens.",
+        )
+        cfg.chunker.overlap = st.slider(
+            "overlap", 0, 256, cfg.chunker.overlap, 8,
+            help="Tokens repeated between adjacent chunks.",
+        )
+        try:
+            installed = models_mod.installed_models()
+        except Exception:  # noqa: BLE001
+            installed = []
+        embed_models = list(EMBEDDING_DIMENSIONS)
+        labels = config_logic.embedder_model_labels(installed)
+        embed_index = (
+            embed_models.index(cfg.embedder.model)
+            if cfg.embedder.model in embed_models else 0
+        )
+        cfg.embedder.model = st.selectbox(
+            "embedding model", embed_models, index=embed_index,
+            format_func=lambda m: labels[m],
+            help="Changing this requires a rebuild.",
+        )
 
     st.divider()
     if indexer_mod.status(ws, corpus, cfg).cached:
