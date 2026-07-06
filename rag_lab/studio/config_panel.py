@@ -31,22 +31,17 @@ def _run_pull(model: str) -> None:
 
 def _render_corpus(session) -> None:
     st.subheader("Corpus")
-    corpus_names = corpora_mod.list_corpora(Workspace.default())
-    options = ["(local folder)"] + corpus_names
-    current = session.get("corpus_name") or "(local folder)"
-    choice = st.selectbox(
-        "Active corpus", options,
-        index=options.index(current) if current in options else 0,
-        help="Pick a curated corpus, or use a local folder. Manage corpora on the Corpus page.",
-    )
-    if choice == "(local folder)":
+    names = corpora_mod.list_corpora(Workspace.default())
+    if not names:
+        st.info("No corpora yet — create one on the Corpus page.")
         session["corpus_name"] = None
-        session["corpus"] = st.text_input(
-            "Corpus directory", value=session["corpus"],
-            help="Folder of markdown (.md) files. Searched recursively.",
-        ).strip()
-    else:
-        session["corpus_name"] = choice
+        return
+    current = session.get("corpus_name")
+    index = names.index(current) if current in names else 0
+    session["corpus_name"] = st.selectbox(
+        "Active corpus", names, index=index,
+        help="Which corpus to query. Create and build corpora on the Corpus page.",
+    )
     st.caption(f"Golden set: `{session['golden']}`")
 
 
