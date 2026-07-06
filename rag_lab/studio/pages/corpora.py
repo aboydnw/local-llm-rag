@@ -100,10 +100,11 @@ def render() -> None:
             st.rerun()
 
     with st.expander("⚙️ Build settings (chunker + embedder)"):
-        chunker_types = ["markdown_aware", "fixed"]
+        chunker_types = ["markdown_aware", "fixed", "recursive", "semantic"]
         cfg.chunker.type = st.selectbox(
             "chunker type", chunker_types, index=chunker_types.index(cfg.chunker.type),
-            help="'markdown_aware' splits on headings; 'fixed' splits on a flat token count.",
+            help="'markdown_aware' splits on headings; 'fixed' on a flat token count; "
+            "'recursive' on paragraphs/sentences/tokens; 'semantic' on meaning shifts.",
         )
         max_tokens_default = min(2048, max(64, cfg.chunker.max_tokens))
         cfg.chunker.max_tokens = st.slider(
@@ -116,6 +117,11 @@ def render() -> None:
             "overlap", 0, min(256, overlap_ceiling), overlap_default, 8,
             help="Tokens repeated between adjacent chunks. Capped below max_tokens.",
         )
+        if cfg.chunker.type == "semantic":
+            cfg.chunker.similarity_threshold = st.slider(
+                "similarity_threshold", 0.0, 1.0, cfg.chunker.similarity_threshold, 0.05,
+                help="Higher = more, smaller chunks. Only used by 'semantic'.",
+            )
         try:
             installed = models_mod.installed_models()
         except Exception:  # noqa: BLE001

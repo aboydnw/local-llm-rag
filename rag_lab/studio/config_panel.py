@@ -167,11 +167,13 @@ def _render_models(cfg: Config, installed: list[str], ollama_error: str | None) 
 
 def _render_chunker(cfg: Config) -> None:
     st.subheader("Chunker  🟠 re-index")
-    chunker_types = ["markdown_aware", "fixed"]
+    chunker_types = ["markdown_aware", "fixed", "recursive", "semantic"]
     cfg.chunker.type = st.selectbox(
         "type", chunker_types, index=chunker_types.index(cfg.chunker.type),
         help="How documents are split. 'markdown_aware' splits on headings; "
-        "'fixed' splits on a flat token count.",
+        "'fixed' splits on a flat token count; 'recursive' splits on "
+        "paragraphs then sentences then tokens; 'semantic' splits where "
+        "adjacent sentences diverge in meaning (slower — embeds at ingest).",
     )
     cfg.chunker.max_tokens = st.slider(
         "max_tokens", 64, 2048, cfg.chunker.max_tokens, 32,
@@ -181,6 +183,12 @@ def _render_chunker(cfg: Config) -> None:
         "overlap", 0, 256, cfg.chunker.overlap, 8,
         help="Tokens repeated between adjacent chunks so ideas spanning a boundary aren't lost.",
     )
+    if cfg.chunker.type == "semantic":
+        cfg.chunker.similarity_threshold = st.slider(
+            "similarity_threshold", 0.0, 1.0, cfg.chunker.similarity_threshold, 0.05,
+            help="Higher = more, smaller chunks; lower = fewer, larger chunks. "
+            "Only used by the 'semantic' chunker.",
+        )
 
 
 def _render_prompt(cfg: Config) -> None:
