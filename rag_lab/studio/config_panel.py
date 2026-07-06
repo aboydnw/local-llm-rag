@@ -47,31 +47,31 @@ def _render_corpus(session) -> None:
 
 def _render_retrieval_method(cfg: Config) -> None:
     st.subheader("Retrieval method")
-    method = config_logic.retrieval_method(cfg)
+    modes = ["direct", "agentic"]
+    labels = {"direct": "Direct search", "agentic": "Agentic"}
+    current = config_logic.search_mode(cfg)
     chosen = st.radio(
-        "method", config_logic.RETRIEVAL_METHODS,
-        index=config_logic.RETRIEVAL_METHODS.index(method),
-        help="How chunks are found. vector = semantic similarity, bm25 = keyword match, "
-        "hybrid = a blend, agent = the LLM orchestrates retrieval itself, step by step.",
+        "search method", modes, index=modes.index(current),
+        format_func=lambda m: labels[m],
+        help="Direct = one retrieval pass you tune (a vector/keyword blend). "
+        "Agentic = the LLM orchestrates retrieval itself, step by step.",
     )
-    config_logic.apply_retrieval_method(cfg, chosen)
-
-    if chosen == "agent":
+    config_logic.apply_search_mode(cfg, chosen)
+    if chosen == "agentic":
         _render_agent_knobs(cfg)
     else:
-        _render_fixed_knobs(cfg, chosen)
+        _render_direct_knobs(cfg)
 
 
-def _render_fixed_knobs(cfg: Config, method: str) -> None:
-    if method == "hybrid":
-        vector_weight = st.slider(
-            "vector_weight", 0.0, 1.0, cfg.retriever.vector_weight, 0.05,
-            help="How much to favor semantic search over keyword search. "
-            "1.0 = pure vector, 0.0 = pure keyword.",
-        )
-        weights = ui_state.normalized_weights(vector_weight)
-        cfg.retriever.vector_weight, cfg.retriever.bm25_weight = weights
-        st.caption(f"bm25_weight = {cfg.retriever.bm25_weight}")
+def _render_direct_knobs(cfg: Config) -> None:
+    vector_weight = st.slider(
+        "Vector ↔ Keyword", 0.0, 1.0, cfg.retriever.vector_weight, 0.05,
+        help="Blend of the two searches. 1.0 = vector only (semantic), "
+        "0.0 = keyword only (bm25); in between fuses both by reciprocal rank.",
+    )
+    weights = ui_state.normalized_weights(vector_weight)
+    cfg.retriever.vector_weight, cfg.retriever.bm25_weight = weights
+    st.caption(f"vector {cfg.retriever.vector_weight} · keyword {cfg.retriever.bm25_weight}")
     cfg.retriever.k = st.slider(
         "k", 1, 20, cfg.retriever.k,
         help="How many chunks to retrieve and feed to the LLM for each question.",
@@ -79,8 +79,8 @@ def _render_fixed_knobs(cfg: Config, method: str) -> None:
     rerankers = ["none", "llm"]
     cfg.retriever.reranker = st.radio(
         "reranker", rerankers, index=rerankers.index(cfg.retriever.reranker),
-        help="Optional second pass: 'llm' asks the model to reorder a larger candidate set "
-        "down to k by relevance. Costs extra LLM calls; no rebuild needed.",
+        help="Optional second pass: 'llm' reorders a larger candidate set down to k by "
+        "relevance. Costs extra LLM calls; no rebuild needed.",
     )
     if cfg.retriever.reranker == "llm":
         cfg.retriever.rerank_candidates = st.number_input(
