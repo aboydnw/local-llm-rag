@@ -4,6 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from rag_lab.studio import config_panel
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import experiments
 from rag_lab.studio.workspace import Workspace
@@ -12,7 +13,7 @@ from rag_lab.studio.workspace import Workspace
 def render() -> None:
     """Render the Evaluate page: run the golden set and show aggregates + report."""
     st.title("Evaluate")
-    cfg = st.session_state["config"]
+    cfg = config_panel.render(st.session_state, "evaluate")
     ws = Workspace.default()
     ws.initialize()
     corpus = corpora_mod.resolve_active_corpus(
@@ -42,6 +43,7 @@ def render() -> None:
         st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
     if st.button("Run eval", type="primary"):
+        st.session_state["evaluate_config_acted"] = True
         if not golden.exists():
             st.error(f"Golden set not found: {golden}")
             return

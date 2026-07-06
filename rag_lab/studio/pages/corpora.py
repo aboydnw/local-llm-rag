@@ -1,7 +1,10 @@
 import streamlit as st
 
+from rag_lab.config import EMBEDDING_DIMENSIONS
+from rag_lab.studio import config_logic
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio import models as models_mod
 from rag_lab.studio.corpora import Corpus, Source
 from rag_lab.studio.workspace import Workspace
 
@@ -95,6 +98,39 @@ def render() -> None:
                 ),
             )
             st.rerun()
+
+    with st.expander("⚙️ Build settings (chunker + embedder)"):
+        chunker_types = ["markdown_aware", "fixed"]
+        cfg.chunker.type = st.selectbox(
+            "chunker type", chunker_types, index=chunker_types.index(cfg.chunker.type),
+            help="'markdown_aware' splits on headings; 'fixed' splits on a flat token count.",
+        )
+        max_tokens_default = min(2048, max(64, cfg.chunker.max_tokens))
+        cfg.chunker.max_tokens = st.slider(
+            "max_tokens", 64, 2048, max_tokens_default, 32,
+            help="Largest chunk size, in tokens.",
+        )
+        overlap_ceiling = max(0, cfg.chunker.max_tokens - 1)
+        overlap_default = min(256, overlap_ceiling, max(0, cfg.chunker.overlap))
+        cfg.chunker.overlap = st.slider(
+            "overlap", 0, min(256, overlap_ceiling), overlap_default, 8,
+            help="Tokens repeated between adjacent chunks. Capped below max_tokens.",
+        )
+        try:
+            installed = models_mod.installed_models()
+        except Exception:  # noqa: BLE001
+            installed = []
+        embed_models = list(EMBEDDING_DIMENSIONS)
+        labels = config_logic.embedder_model_labels(installed)
+        if cfg.embedder.model not in embed_models:
+            embed_models.append(cfg.embedder.model)
+            labels = {**labels, cfg.embedder.model: f"{cfg.embedder.model} (unknown dimension)"}
+        embed_index = embed_models.index(cfg.embedder.model)
+        cfg.embedder.model = st.selectbox(
+            "embedding model", embed_models, index=embed_index,
+            format_func=lambda m: labels[m],
+            help="Changing this requires a rebuild.",
+        )
 
     st.divider()
     if indexer_mod.status(ws, corpus, cfg).cached:
