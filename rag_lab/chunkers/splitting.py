@@ -49,7 +49,8 @@ def cascade_split(
         if current and _count(candidate, encoder) > max_tokens:
             yield current
             tail = _overlap_tail(current, encoder, overlap)
-            current = f"{tail}\n\n{unit}" if tail else unit
+            merged = f"{tail}\n\n{unit}" if tail else unit
+            current = merged if _count(merged, encoder) <= max_tokens else unit
         else:
             current = candidate
     if current:

@@ -49,3 +49,15 @@ def test_cascade_split_windows_a_single_oversized_sentence():
     body = "word " * 400
     chunks = list(splitting.cascade_split(body.strip(), _enc(), max_tokens=50, overlap=0))
     assert len(chunks) >= 2
+
+
+def test_cascade_split_never_exceeds_max_tokens_with_overlap():
+    enc = _enc()
+    body = " ".join(
+        f"Alpha beta gamma delta epsilon zeta eta theta number {i} done."
+        for i in range(40)
+    )
+    max_tokens = 20
+    chunks = list(splitting.cascade_split(body, enc, max_tokens=max_tokens, overlap=15))
+    assert chunks
+    assert all(len(enc.encode(c)) <= max_tokens for c in chunks)

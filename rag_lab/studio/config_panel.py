@@ -175,13 +175,17 @@ def _render_chunker(cfg: Config) -> None:
         "paragraphs then sentences then tokens; 'semantic' splits where "
         "adjacent sentences diverge in meaning (slower — embeds at ingest).",
     )
+    max_tokens_default = min(2048, max(64, cfg.chunker.max_tokens))
     cfg.chunker.max_tokens = st.slider(
-        "max_tokens", 64, 2048, cfg.chunker.max_tokens, 32,
+        "max_tokens", 64, 2048, max_tokens_default, 32,
         help="Largest chunk size, in tokens.",
     )
+    overlap_ceiling = max(0, cfg.chunker.max_tokens - 1)
+    overlap_default = min(256, overlap_ceiling, max(0, cfg.chunker.overlap))
     cfg.chunker.overlap = st.slider(
-        "overlap", 0, 256, cfg.chunker.overlap, 8,
-        help="Tokens repeated between adjacent chunks so ideas spanning a boundary aren't lost.",
+        "overlap", 0, min(256, overlap_ceiling), overlap_default, 8,
+        help="Tokens repeated between adjacent chunks so ideas spanning a boundary aren't lost. "
+        "Capped below max_tokens.",
     )
     if cfg.chunker.type == "semantic":
         cfg.chunker.similarity_threshold = st.slider(

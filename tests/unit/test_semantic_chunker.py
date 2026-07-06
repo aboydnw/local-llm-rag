@@ -69,3 +69,20 @@ def test_context_header_prepends_document_label():
 
 def test_empty_document_yields_no_chunks():
     assert list(SemanticChunker(FakeEmbedder(16)).chunk(_doc("   "))) == []
+
+
+def test_larger_overlap_carries_more_sentences_forward():
+    text = " ".join(f"Sentence {i} here." for i in range(5))
+    small = list(
+        SemanticChunker(
+            FakeEmbedder(16), max_tokens=1000, similarity_threshold=2.0, overlap=1
+        ).chunk(_doc(text))
+    )
+    large = list(
+        SemanticChunker(
+            FakeEmbedder(16), max_tokens=1000, similarity_threshold=2.0, overlap=40
+        ).chunk(_doc(text))
+    )
+    small_words = sum(len(c.text.split()) for c in small)
+    large_words = sum(len(c.text.split()) for c in large)
+    assert large_words > small_words

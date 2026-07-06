@@ -33,14 +33,14 @@ class SemanticChunker:
         position = 0
         current: list[str] = []
         previous: list[float] | None = None
-        for sentence, vector in zip(sentences, embeddings):
+        for sentence, vector in zip(sentences, embeddings, strict=True):
             if current:
                 similar = _cosine(previous, vector) >= self.similarity_threshold
                 fits = self._count(" ".join([*current, sentence])) <= self.max_tokens
                 if not similar or not fits:
                     yield self._emit(document, current, position)
                     position += 1
-                    current = current[-1:] if self.overlap > 0 else []
+                    current = self._overlap_sentences(current)
             current.append(sentence)
             previous = vector
         if current:
@@ -48,6 +48,18 @@ class SemanticChunker:
 
     def _count(self, text: str) -> int:
         return len(self._encoder.encode(text))
+
+    def _overlap_sentences(self, sentences: list[str]) -> list[str]:
+        if self.overlap <= 0:
+            return []
+        tail: list[str] = []
+        total = 0
+        for sentence in reversed(sentences):
+            tail.insert(0, sentence)
+            total += self._count(sentence)
+            if total >= self.overlap:
+                break
+        return tail
 
     def _emit(self, document: Document, sentences: list[str], position: int) -> Chunk:
         body = " ".join(sentences)
@@ -64,7 +76,7 @@ class SemanticChunker:
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm_a = sum(x * x for x in a) ** 0.5
     norm_b = sum(y * y for y in b) ** 0.5
     if norm_a == 0 or norm_b == 0:
