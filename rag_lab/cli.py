@@ -6,7 +6,6 @@ import typer
 from rag_lab import __version__, pipeline
 from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
-from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.reporter import MarkdownReporter
 from rag_lab.eval.run_artifact import prompt_version, write_run
@@ -96,12 +95,8 @@ def ingest(
                 raise typer.Exit(code=1)
             loader = MarkdownLoader(source)
 
-        chunker = MarkdownAwareChunker(
-            max_tokens=cfg.chunker.max_tokens,
-            overlap=cfg.chunker.overlap,
-            context_header=cfg.chunker.context_header,
-        )
         embedder = pipeline.build_embedder(cfg)
+        chunker = pipeline.build_chunker(cfg, embedder=embedder)
         store = pipeline.build_store(cfg, db)
 
         typer.echo(f"Ingesting into {db}...")
