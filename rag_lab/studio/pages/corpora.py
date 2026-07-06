@@ -105,13 +105,16 @@ def render() -> None:
             "chunker type", chunker_types, index=chunker_types.index(cfg.chunker.type),
             help="'markdown_aware' splits on headings; 'fixed' splits on a flat token count.",
         )
+        max_tokens_default = min(2048, max(64, cfg.chunker.max_tokens))
         cfg.chunker.max_tokens = st.slider(
-            "max_tokens", 64, 2048, cfg.chunker.max_tokens, 32,
+            "max_tokens", 64, 2048, max_tokens_default, 32,
             help="Largest chunk size, in tokens.",
         )
+        overlap_ceiling = max(0, cfg.chunker.max_tokens - 1)
+        overlap_default = min(256, overlap_ceiling, max(0, cfg.chunker.overlap))
         cfg.chunker.overlap = st.slider(
-            "overlap", 0, 256, cfg.chunker.overlap, 8,
-            help="Tokens repeated between adjacent chunks.",
+            "overlap", 0, min(256, overlap_ceiling), overlap_default, 8,
+            help="Tokens repeated between adjacent chunks. Capped below max_tokens.",
         )
         try:
             installed = models_mod.installed_models()
@@ -119,10 +122,10 @@ def render() -> None:
             installed = []
         embed_models = list(EMBEDDING_DIMENSIONS)
         labels = config_logic.embedder_model_labels(installed)
-        embed_index = (
-            embed_models.index(cfg.embedder.model)
-            if cfg.embedder.model in embed_models else 0
-        )
+        if cfg.embedder.model not in embed_models:
+            embed_models.append(cfg.embedder.model)
+            labels = {**labels, cfg.embedder.model: f"{cfg.embedder.model} (unknown dimension)"}
+        embed_index = embed_models.index(cfg.embedder.model)
         cfg.embedder.model = st.selectbox(
             "embedding model", embed_models, index=embed_index,
             format_func=lambda m: labels[m],

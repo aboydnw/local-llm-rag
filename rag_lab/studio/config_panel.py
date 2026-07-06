@@ -145,12 +145,16 @@ def _render_models(cfg: Config, installed: list[str], ollama_error: str | None) 
         name = st.text_input("Model name to pull", key="llm_pull_name", placeholder="llama3.2:3b")
         if st.button("Pull", key="llm_pull_btn") and name.strip():
             _run_pull(name.strip())
+            cfg.llm.model = name.strip()
     else:
         cfg.llm.model = llm_choice
 
     embed_models = list(EMBEDDING_DIMENSIONS)
     labels = config_logic.embedder_model_labels(installed)
-    embed_index = embed_models.index(cfg.embedder.model) if cfg.embedder.model in embed_models else 0
+    if cfg.embedder.model not in embed_models:
+        embed_models.append(cfg.embedder.model)
+        labels = {**labels, cfg.embedder.model: f"{cfg.embedder.model} (unknown dimension)"}
+    embed_index = embed_models.index(cfg.embedder.model)
     cfg.embedder.model = st.selectbox(
         "Embedding model  🟠 re-index", embed_models, index=embed_index,
         format_func=lambda m: labels[m],
@@ -207,10 +211,13 @@ def _render_actions(session, cfg: Config, ws: Workspace) -> None:
 
     col1, col2 = st.columns(2)
     if col1.button("Save to rag.yml"):
-        Path("rag.yml").write_text(
-            yaml.safe_dump(cfg.model_dump(), allow_unicode=True), encoding="utf-8"
-        )
-        st.toast("Saved rag.yml")
+        try:
+            Path("rag.yml").write_text(
+                yaml.safe_dump(cfg.model_dump(), allow_unicode=True), encoding="utf-8"
+            )
+            st.toast("Saved rag.yml")
+        except OSError as exc:
+            st.error(f"Failed to save rag.yml: {exc}")
     if col2.button("Build index", disabled=corpus_error is not None):
         try:
             with st.spinner("Building index..."):
@@ -235,14 +242,18 @@ def render(session, page_key: str) -> Config:
     active = corpora_mod.resolve_active_corpus(
         ws, session.get("corpus_name"), session["corpus"]
     )
+    status_error: str | None = None
     try:
         cached = indexer_mod.status(ws, active, cfg).cached
         status_badge = "✓ cached" if cached else "⚠ needs build"
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         status_badge = "⚠ needs build"
+        status_error = str(exc)
 
-    header = f"⚙️ Config — {config_summary(cfg)}  ·  {status_badge}"
-    with st.expander(header, expanded=config_logic.config_expanded(session, page_key)):
+    with st.expander("⚙️ Config", expanded=config_logic.config_expanded(session, page_key)):
+        st.caption(f"{config_summary(cfg)}  ·  {status_badge}")
+        if status_error is not None:
+            st.info(f"Index status unavailable: {status_error}")
         _render_corpus(session)
         _render_retrieval_method(cfg)
         _render_models(cfg, installed, ollama_error)

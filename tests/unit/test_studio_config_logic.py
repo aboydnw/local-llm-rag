@@ -64,3 +64,8 @@ def test_config_expanded_true_before_action():
 def test_config_expanded_false_after_action():
     session = {"playground_config_acted": True}
     assert config_logic.config_expanded(session, "playground") is False
+
+
+def test_config_expanded_is_namespaced_by_page():
+    session = {"evaluate_config_acted": True}
+    assert config_logic.config_expanded(session, "playground") is True
