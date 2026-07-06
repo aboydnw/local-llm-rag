@@ -35,7 +35,7 @@ def main() -> None:
                 url_path="playground", default=True),
         st.Page(corpora_page.render, title="Corpus", icon="📚", url_path="corpus"),
         st.Page(evaluate.render, title="Evaluate", icon="📊", url_path="evaluate"),
-        st.Page(runs.render, title="Runs", icon="🏆", url_path="runs"),
+        st.Page(runs.render, title="Past Evaluation Runs", icon="🏆", url_path="runs"),
         st.Page(golden.render, title="Golden set", icon="✏️", url_path="golden"),
     ])
     pages.run()
