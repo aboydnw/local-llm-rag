@@ -129,6 +129,21 @@ def test_config_summary_mentions_key_knobs():
     assert "nomic-embed-text" in summary
 
 
+def test_config_summary_marks_agent_runs():
+    config = Config()
+    config.agent.enabled = True
+    config.agent.max_steps = 4
+    config.agent.tools = ["vector_search", "keyword_search"]
+    summary = config_mod.config_summary(config)
+    assert "agent=on" in summary
+    assert "steps=4" in summary
+    assert "tools=2" in summary
+
+
+def test_config_summary_omits_agent_when_disabled():
+    assert "agent" not in config_mod.config_summary(Config())
+
+
 def test_config_prompt_defaults_to_canonical_instructions():
     assert Config().prompt.system_instructions == DEFAULT_SYSTEM_INSTRUCTIONS
 

@@ -140,6 +140,11 @@ def render(session) -> Config:
         "Slower — several LLM calls per question — but you can watch it reason.",
     )
     if cfg.agent.enabled:
+        st.sidebar.caption(
+            "Agent mode replaces the fixed retriever above: type, weights, and "
+            "reranker are ignored; k is reused as each search tool's fetch size. "
+            "Keep a non-agent run around as your baseline to compare against."
+        )
         cfg.agent.max_steps = st.sidebar.slider(
             "max_steps", 1, 12, cfg.agent.max_steps,
             help="Hard cap on reasoning steps before the agent must answer with "
