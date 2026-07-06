@@ -128,3 +128,45 @@ def test_check_index_compatible_flags_missing_metadata(tmp_path: Path) -> None:
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()
     assert pipeline.check_index_compatible(store, Config()) is not None
+
+
+def test_build_chunker_defaults_to_markdown_aware():
+    from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
+
+    assert isinstance(pipeline.build_chunker(Config()), MarkdownAwareChunker)
+
+
+def test_build_chunker_honors_fixed_type():
+    from rag_lab.chunkers.fixed import FixedSizeChunker
+
+    config = Config()
+    config.chunker.type = "fixed"
+    assert isinstance(pipeline.build_chunker(config), FixedSizeChunker)
+
+
+def test_build_chunker_honors_recursive_type():
+    from rag_lab.chunkers.recursive import RecursiveChunker
+
+    config = Config()
+    config.chunker.type = "recursive"
+    assert isinstance(pipeline.build_chunker(config), RecursiveChunker)
+
+
+def test_build_chunker_semantic_uses_supplied_embedder():
+    from rag_lab.chunkers.semantic import SemanticChunker
+
+    config = Config()
+    config.chunker.type = "semantic"
+    embedder = FakeEmbedder(16)
+    chunker = pipeline.build_chunker(config, embedder=embedder)
+    assert isinstance(chunker, SemanticChunker)
+    assert chunker.embedder is embedder
+
+
+def test_build_chunker_rejects_unknown_type():
+    import pytest
+
+    config = Config()
+    config.chunker.type = "bogus"
+    with pytest.raises(ValueError):
+        pipeline.build_chunker(config)

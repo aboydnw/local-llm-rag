@@ -8,6 +8,11 @@ from rag_lab.agent.tools import (
     ListDocumentsTool,
     SearchTool,
 )
+from rag_lab.chunkers.base import Chunker
+from rag_lab.chunkers.fixed import FixedSizeChunker
+from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
+from rag_lab.chunkers.recursive import RecursiveChunker
+from rag_lab.chunkers.semantic import SemanticChunker
 from rag_lab.config import Config, embedding_dimension
 from rag_lab.embedders.ollama import OllamaEmbedder, prefixes_for_model
 from rag_lab.llms.ollama import OllamaLLM
@@ -33,6 +38,37 @@ def build_embedder(config: Config) -> OllamaEmbedder:
         document_prefix=document_prefix,
         query_prefix=query_prefix,
     )
+
+
+def build_chunker(config: Config, embedder=None) -> Chunker:
+    chunker = config.chunker
+    if chunker.type == "markdown_aware":
+        return MarkdownAwareChunker(
+            max_tokens=chunker.max_tokens,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    if chunker.type == "fixed":
+        return FixedSizeChunker(
+            max_tokens=chunker.max_tokens,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    if chunker.type == "recursive":
+        return RecursiveChunker(
+            max_tokens=chunker.max_tokens,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    if chunker.type == "semantic":
+        return SemanticChunker(
+            embedder=embedder or build_embedder(config),
+            max_tokens=chunker.max_tokens,
+            similarity_threshold=chunker.similarity_threshold,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    raise ValueError(f"Unknown chunker type: {chunker.type}")
 
 
 def build_llm(config: Config) -> OllamaLLM:
