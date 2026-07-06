@@ -3,6 +3,7 @@ from rag_lab.studio import models as models_mod
 
 RETRIEVAL_METHODS: list[str] = ["vector", "bm25", "hybrid", "agent"]
 PULL_SENTINEL: str = "➕ Pull another model…"
+ADD_CORPUS_SENTINEL: str = "➕ Add corpus…"
 
 
 def retrieval_method(config: Config) -> str:
@@ -41,3 +42,8 @@ def embedder_model_labels(installed: list[str]) -> dict[str, str]:
 def config_expanded(session, page_key: str) -> bool:
     """The config panel starts expanded and collapses once the page records an action."""
     return not session.get(f"{page_key}_config_acted", False)
+
+
+def corpus_options(names: list[str]) -> list[str]:
+    """Corpus dropdown options: existing names followed by an 'add corpus' sentinel."""
+    return [*names, ADD_CORPUS_SENTINEL]

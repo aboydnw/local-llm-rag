@@ -69,3 +69,12 @@ def test_config_expanded_false_after_action():
 def test_config_expanded_is_namespaced_by_page():
     session = {"evaluate_config_acted": True}
     assert config_logic.config_expanded(session, "playground") is True
+
+
+def test_corpus_options_appends_sentinel_last():
+    opts = config_logic.corpus_options(["titiler", "stac"])
+    assert opts == ["titiler", "stac", config_logic.ADD_CORPUS_SENTINEL]
+
+
+def test_corpus_options_empty_is_just_sentinel():
+    assert config_logic.corpus_options([]) == [config_logic.ADD_CORPUS_SENTINEL]
