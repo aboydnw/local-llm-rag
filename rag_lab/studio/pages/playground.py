@@ -4,6 +4,7 @@ from rag_lab.agent.agent import trace_dict
 from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
+from rag_lab.studio import config_panel
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio import share as share_mod
@@ -14,8 +15,10 @@ from rag_lab.studio.workspace import Workspace
 def render() -> None:
     """Render the Ask playground: retrieve chunks and generate an answer for a question."""
     st.title("Ask playground")
-    cfg = st.session_state["config"]
+    cfg = config_panel.render(st.session_state, "playground")
     question = st.text_input("Question", placeholder="What is titiler?")
+    if question.strip():
+        st.session_state["playground_config_acted"] = True
 
     ws = Workspace.default()
     corpus = corpora_mod.resolve_active_corpus(
@@ -26,11 +29,11 @@ def render() -> None:
     else:
         st.warning(
             f"No saved corpus selected — querying the local folder `{corpus.label}`. "
-            "Select a corpus in the sidebar to query it instead."
+            "Select a corpus in the config panel to query it instead."
         )
     status = indexer_mod.status(ws, corpus, cfg)
     if status.needs_build:
-        st.warning("This config has no built index yet. Use **Build index** in the sidebar.")
+        st.warning("This config has no built index yet. Use **Build index** in the config panel above.")
         return
     question = question.strip()
     if not question:
