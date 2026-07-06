@@ -51,7 +51,7 @@ def render() -> None:
         if not golden.exists():
             st.error(f"Golden set not found: {golden}")
             return
-        with st.spinner("Running eval (this builds the index if needed)..."):
+        with st.spinner("Running eval..."):
             try:
                 record = experiments.run_eval(
                     ws, corpus, cfg, golden,
