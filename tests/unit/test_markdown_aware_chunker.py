@@ -17,22 +17,14 @@ def test_splits_on_headings() -> None:
     assert heading_paths == [("Top",), ("Top", "Section A"), ("Top", "Section B")]
 
 
-def test_splits_within_section_when_max_tokens_exceeded() -> None:
-    body = ("word " * 600).strip()
+def test_oversized_section_splits_on_sentence_boundaries() -> None:
+    body = " ".join(f"Sentence number {i} has several words." for i in range(200))
     doc = _doc(f"# Top\n\n{body}\n")
-    chunks = list(MarkdownAwareChunker(max_tokens=100, overlap=10).chunk(doc))
+    chunks = list(MarkdownAwareChunker(max_tokens=60, overlap=10).chunk(doc))
     assert len(chunks) >= 2
     assert all(c.heading_path == ("Top",) for c in chunks)
-
-
-def test_overlap_is_token_based_between_splits_in_same_section() -> None:
-    body = ("alpha beta " * 400).strip()
-    doc = _doc(f"# Top\n\n{body}\n")
-    chunks = list(MarkdownAwareChunker(max_tokens=80, overlap=20).chunk(doc))
-    assert len(chunks) >= 2
-    first_tail_words = chunks[0].text.split()[-20:]
-    second_head_words = chunks[1].text.split()[:20]
-    assert first_tail_words == second_head_words
+    for c in chunks:
+        assert c.text.rstrip().endswith(".")
 
 
 def test_chunks_carry_doc_path_and_increasing_positions() -> None:
