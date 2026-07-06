@@ -50,7 +50,11 @@ Supporting commands: `rag-lab inspect chunks` (debug what got indexed), `rag-lab
 ### Explicitly out of scope for v1
 Multi-turn chat, cross-encoder reranking, query rewriting/HyDE, web crawler and PDF loaders, cloud LLM/embedding fallback, multi-corpus operation, and incremental re-indexing. Each is a natural follow-up the eval harness can later justify.
 
-A local web UI (**studio**) was an explicit post-v1 follow-up and has since shipped — see below.
+A local web UI (**studio**) and **agentic retrieval** were explicit post-v1 follow-ups and have since shipped — see below.
+
+## Post-v1 direction: an agent lab
+
+The project's purpose has widened beyond "RAG that works": it's a place to **build and study agents on local models** — turn the knobs, watch the reasoning, and measure the result. Agentic retrieval (shipped) is the first expression of that: the LLM orchestrates retrieval tools in a ReAct loop instead of running one fixed pipeline. The fixed retrievers stay: they're the measurable baseline every agent experiment is compared against. The boundary holds from the other side too — this is a learning lab, not an agent framework; features earn their place by making agent behavior more visible, tunable, or measurable.
 
 ## Success criteria
 
@@ -67,6 +71,8 @@ v1 ships when:
 All three loops are built and tested: **ingest** (loader, markdown-aware chunker, Ollama embedder, sqlite-vec store), **query** (hybrid retrieval, cited answers via a local LLM), and **eval** (golden set, retrieval + answer scorers, optional LLM judge, committed markdown reports).
 
 Beyond v1, **studio** (`rag-lab studio`) has shipped: a local Streamlit interface to turn every config knob, edit the golden set, run evals, and compare runs on a leaderboard. It reuses the same swappable components and adds a gitignored `.rag-lab/` workspace for cached indexes and run history. The studio is an optional extra; the core CLI runs without it.
+
+**Agentic retrieval** has also shipped: an opt-in ReAct agent (`ask --agent`, `eval --agent`, or `agent.enabled` in `rag.yml`) that picks its own retrieval tools (vector search, keyword search, list documents, fetch document), with every knob exposed — step cap, tool subset, final context size, and the agent prompt itself. Eval scores agent runs with the same retrieval metrics as fixed-retriever runs (computed over the context that reached the answer), plus agent diagnostics (seen-vs-final recall gap, tool/LLM call counts), and persists per-question traces for inspection in the studio.
 
 ## Reference
 
