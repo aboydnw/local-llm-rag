@@ -1,7 +1,6 @@
 import streamlit as st
 
-from rag_lab.studio import build_settings
-from rag_lab.studio import config_logic
+from rag_lab.studio import build_settings, config_logic
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.corpora import Corpus, Source

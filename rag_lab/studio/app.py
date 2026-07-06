@@ -6,9 +6,9 @@ from rag_lab import config as config_mod
 from rag_lab.config import Config
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import sidebar, ui_state
-from rag_lab.studio.workspace import Workspace
 from rag_lab.studio.pages import corpora as corpora_page
 from rag_lab.studio.pages import evaluate, golden, playground, runs
+from rag_lab.studio.workspace import Workspace
 
 
 def _load_config() -> Config:

@@ -1,9 +1,8 @@
 import streamlit as st
 
 from rag_lab.config import EMBEDDING_DIMENSIONS, Config
-from rag_lab.studio import config_logic
+from rag_lab.studio import config_logic, pull_ui
 from rag_lab.studio import models as models_mod
-from rag_lab.studio import pull_ui
 
 
 def render(cfg: Config) -> None:
