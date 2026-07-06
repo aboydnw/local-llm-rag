@@ -133,9 +133,11 @@ def test_config_summary_marks_agent_runs():
     config = Config()
     config.agent.enabled = True
     config.agent.max_steps = 4
+    config.agent.tools = ["vector_search", "keyword_search"]
     summary = config_mod.config_summary(config)
     assert "agent=on" in summary
     assert "steps=4" in summary
+    assert "tools=2" in summary
 
 
 def test_config_summary_omits_agent_when_disabled():
