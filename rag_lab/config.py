@@ -94,11 +94,15 @@ def embedding_dimension(model: str) -> int:
 def config_summary(config: Config) -> str:
     """One-line human summary of the swappable knobs in a config."""
     r = config.retriever
-    return (
+    summary = (
         f"chunker={config.chunker.type}@{config.chunker.max_tokens} "
         f"retriever={r.type}(v={r.vector_weight},b={r.bm25_weight}) "
         f"llm={config.llm.model} embedder={config.embedder.model}"
     )
+    if config.agent.enabled:
+        a = config.agent
+        summary += f" agent=on(steps={a.max_steps},tools={len(a.tools)})"
+    return summary
 
 
 DEFAULT_CONFIG_YAML = """\
