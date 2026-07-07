@@ -16,7 +16,7 @@ class MarkdownLoader:
 
     def load(self) -> Iterator[Document]:
         for path in sorted(self.root.rglob("*.md")):
-            if _EXCLUDED_DIRS.intersection(path.parts):
+            if _EXCLUDED_DIRS.intersection(path.relative_to(self.root).parts):
                 continue
             post = frontmatter.load(path)
             metadata = {k: str(v) for k, v in post.metadata.items()}

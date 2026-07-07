@@ -53,3 +53,14 @@ def test_excludes_rag_lab_workspace_dir(tmp_path: Path) -> None:
     loader = MarkdownLoader(tmp_path)
     docs = list(loader.load())
     assert [d.path.name for d in docs] == ["real.md"]
+
+
+def test_loads_files_when_root_is_inside_rag_lab(tmp_path: Path) -> None:
+    clone = tmp_path / ".rag-lab" / "clones" / "developmentseed__titiler"
+    clone.mkdir(parents=True)
+    (clone / "README.md").write_text("# Cloned repo")
+    (clone / "docs").mkdir()
+    (clone / "docs" / "guide.md").write_text("# Guide")
+    loader = MarkdownLoader(clone)
+    docs = list(loader.load())
+    assert {d.path.name for d in docs} == {"README.md", "guide.md"}
