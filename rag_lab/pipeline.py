@@ -72,7 +72,7 @@ def build_chunker(config: Config, embedder=None) -> Chunker:
 
 
 def build_llm(config: Config) -> OllamaLLM:
-    return OllamaLLM(model=config.llm.model)
+    return OllamaLLM(model=config.llm.model, think=config.llm.think)
 
 
 def build_store(config: Config, db: Path) -> SqliteVecStore:
@@ -134,6 +134,7 @@ def build_agent(store: SqliteVecStore, embedder, config: Config) -> Agent:
         max_steps=config.agent.max_steps,
         final_k=config.agent.final_k,
         instructions=config.agent.instructions,
+        structured_output=config.agent.structured_output,
     )
 
 

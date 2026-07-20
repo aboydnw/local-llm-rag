@@ -43,10 +43,16 @@ class _StubLLM:
     def generate(self, prompt: str) -> str:
         return "factory class MosaicTilerFactory is the answer"
 
+    def last_stats(self):
+        return None
+
 
 class _CitingLLM:
     def generate(self, prompt: str) -> str:
         return "MosaicTilerFactory does this [1]."
+
+    def last_stats(self):
+        return None
 
 
 def test_runner_captures_retrieved_refs_citations_and_latency() -> None:
@@ -129,6 +135,9 @@ def test_runner_uses_provided_prompt_builder() -> None:
             seen["prompt"] = prompt
             return "ok"
 
+        def last_stats(self):
+            return None
+
     runner = EvalRunner(
         retriever=_StubRetriever(["a.md"]),
         llm=_CapturingLLM(),
@@ -191,6 +200,7 @@ def _agent_result():
         chunks_seen=[noise, good],
         final_context=[good],
         llm_calls=3,
+        parse_failures=2,
     )
 
 
@@ -212,6 +222,7 @@ def test_agent_eval_scores_final_context_and_records_agent_metrics():
     assert res.agent_metrics["mrr_seen"] == 0.5
     assert res.agent_metrics["tool_calls"] == 1.0
     assert res.agent_metrics["llm_calls"] == 3.0
+    assert res.agent_metrics["parse_failures"] == 2.0
     assert res.agent_tools_used == ("vector_search",)
     assert "agent" in res.latency_ms
     assert [r.doc_path for r in res.retrieved] == ["docs/right.md"]
@@ -222,6 +233,31 @@ def test_non_agent_eval_leaves_agent_fields_empty():
     (res,) = runner.run([GoldenItem(id="x", question="q")])
     assert res.agent_metrics == {}
     assert res.agent_tools_used == ()
+
+
+def test_non_agent_eval_records_generation_stats():
+    from rag_lab.types import GenerationStats
+
+    class _StatsLLM:
+        def generate(self, prompt: str) -> str:
+            return "answer"
+
+        def last_stats(self):
+            return GenerationStats(
+                prompt_tokens=500, prompt_eval_ms=1000.0,
+                output_tokens=50, generation_ms=2000.0,
+            )
+
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StatsLLM(), k=1)
+    (res,) = runner.run([GoldenItem(id="x", question="q")])
+    assert res.generation_stats["prompt_tokens"] == 500.0
+    assert res.generation_stats["generation_ms"] == 2000.0
+
+
+def test_stats_llm_none_leaves_generation_stats_none():
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=1)
+    (res,) = runner.run([GoldenItem(id="x", question="q")])
+    assert res.generation_stats is None
 
 
 def test_eval_result_records_agent_trace_for_agent_runs():

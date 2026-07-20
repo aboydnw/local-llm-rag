@@ -24,6 +24,9 @@ class EmbedderConfig(BaseModel):
 class LLMConfig(BaseModel):
     type: Literal["ollama"] = "ollama"
     model: str = "llama3.2:3b"
+    think: bool | None = None
+    """Thinking-mode toggle for reasoning models (e.g. Qwen3). None leaves the
+    model default; False disables thinking to cut latency and answer pollution."""
 
 
 class RetrieverConfig(BaseModel):
@@ -48,6 +51,7 @@ class AgentConfig(BaseModel):
     enabled: bool = False
     max_steps: int = Field(default=6, gt=0)
     final_k: int = Field(default=5, gt=0)
+    structured_output: bool = False
     instructions: str = DEFAULT_AGENT_INSTRUCTIONS
     tools: list[
         Literal[
@@ -131,6 +135,7 @@ agent:
   enabled: false
   max_steps: 6
   final_k: 5
+  structured_output: false
   tools:
     - vector_search
     - keyword_search

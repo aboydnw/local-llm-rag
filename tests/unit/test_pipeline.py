@@ -31,6 +31,12 @@ def test_build_llm_uses_config_model() -> None:
     assert pipeline.build_llm(Config()).model == "llama3.2:3b"
 
 
+def test_build_llm_threads_think_setting() -> None:
+    config = Config()
+    config.llm.think = False
+    assert pipeline.build_llm(config).think is False
+
+
 def test_build_prompt_builder_uses_config_instructions() -> None:
     config = Config()
     config.prompt.system_instructions = "custom instructions"

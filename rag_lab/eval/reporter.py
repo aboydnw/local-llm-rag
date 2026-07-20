@@ -2,7 +2,7 @@ import math
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rag_lab.eval.aggregate import aggregate_metrics
+from rag_lab.eval.aggregate import aggregate_metrics, aggregate_perf
 from rag_lab.eval.runner import EvalResult
 
 
@@ -65,6 +65,8 @@ class MarkdownReporter:
                     lines.append(f"| {k} | {prev_str} | {v:.2f} | {delta_str} |")
                 lines.append("")
 
+        lines.extend(self._perf_section(results))
+
         lines.append("## Per-question detail")
         lines.append("")
         deepeval_keys = sorted({k for r in results for k in r.deepeval_scores})
@@ -91,3 +93,25 @@ class MarkdownReporter:
 
     def _aggregates(self, results: list[EvalResult]) -> dict[str, float]:
         return aggregate_metrics(results)
+
+    def _perf_section(self, results: list[EvalResult]) -> list[str]:
+        lines = ["## Performance", ""]
+        perf = aggregate_perf(results)
+        if not perf:
+            lines.append("_Generation stats not captured for this run._")
+            lines.append("")
+            return lines
+        labels = {
+            "prompt_eval_tps": "prompt-eval tok/s",
+            "generation_tps": "generation tok/s",
+            "total_ms": "total latency (ms)",
+        }
+        lines.append("| metric | mean | p50 | p95 |")
+        lines.append("|---|---|---|---|")
+        for key, label in labels.items():
+            lines.append(
+                f"| {label} | {perf[f'{key}_mean']:.1f} | "
+                f"{perf[f'{key}_p50']:.1f} | {perf[f'{key}_p95']:.1f} |"
+            )
+        lines.append("")
+        return lines

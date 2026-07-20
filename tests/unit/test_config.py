@@ -42,6 +42,22 @@ retriever:
     assert cfg.retriever.k == 7
 
 
+def test_example_model_configs_load_with_expected_think_setting() -> None:
+    examples = Path(__file__).resolve().parents[2] / "examples" / "models"
+    qwen = load_config(examples / "qwen3-4b.yml")
+    phi = load_config(examples / "phi4-mini.yml")
+    assert qwen.llm.model == "qwen3:4b"
+    assert qwen.llm.think is False
+    assert phi.llm.model == "phi4-mini"
+    assert phi.llm.think is None
+
+
+def test_llm_config_think_defaults_to_none() -> None:
+    from rag_lab.config import LLMConfig
+
+    assert LLMConfig().think is None
+
+
 def test_load_config_rejects_unknown_chunker_type(tmp_path: Path) -> None:
     cfg_path = tmp_path / "rag.yml"
     cfg_path.write_text("chunker:\n  type: wat\n")

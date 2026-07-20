@@ -10,6 +10,7 @@ from rag_lab.eval.scorers.retrieval import average_precision, mrr, ndcg_at_k, re
 from rag_lab.llms.base import LLM
 from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult, Retriever
+from rag_lab.types import GenerationStats, combine_stats
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +40,18 @@ class EvalResult:
     agent_metrics: dict[str, float] = field(default_factory=dict)
     agent_tools_used: tuple[str, ...] = ()
     agent_trace: list[dict] = field(default_factory=list)
+    generation_stats: dict[str, float] | None = None
+
+
+def _stats_dict(stats: GenerationStats | None) -> dict[str, float] | None:
+    if stats is None:
+        return None
+    return {
+        "prompt_tokens": float(stats.prompt_tokens),
+        "prompt_eval_ms": stats.prompt_eval_ms,
+        "output_tokens": float(stats.output_tokens),
+        "generation_ms": stats.generation_ms,
+    }
 
 
 class EvalRunner:
@@ -86,10 +99,12 @@ class EvalRunner:
                     "mrr_seen": mrr(seen, item.ideal_docs),
                     "tool_calls": float(len(tool_steps)),
                     "llm_calls": float(agent_result.llm_calls),
+                    "parse_failures": float(agent_result.parse_failures),
                 }
                 agent_tools_used = tuple(sorted({s.action for s in tool_steps}))
                 agent_trace = [trace_dict(s) for s in agent_result.steps]
                 latency_ms = {"agent": (t1 - t0) * 1000.0}
+                generation_stats = _stats_dict(combine_stats(agent_result.stats))
             else:
                 t0 = self.clock()
                 results = self.retriever.retrieve(item.question, k=self.k)
@@ -106,6 +121,7 @@ class EvalRunner:
                     "retrieve": (t1 - t0) * 1000.0,
                     "generate": (t2 - t1) * 1000.0,
                 }
+                generation_stats = _stats_dict(self.llm.last_stats())
 
             retrieved = [
                 RetrievedRef(
@@ -145,6 +161,7 @@ class EvalRunner:
                     agent_metrics=agent_metrics,
                     agent_tools_used=agent_tools_used,
                     agent_trace=agent_trace,
+                    generation_stats=generation_stats,
                 )
             )
         return out

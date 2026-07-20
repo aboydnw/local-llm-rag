@@ -4,7 +4,7 @@ import math
 from dataclasses import asdict
 from pathlib import Path
 
-from rag_lab.eval.aggregate import aggregate_metrics
+from rag_lab.eval.aggregate import aggregate_metrics, aggregate_perf
 from rag_lab.eval.runner import EvalResult
 
 SCHEMA_VERSION = 1
@@ -40,6 +40,7 @@ def write_run(
         "prompt_version": prompt_version,
         "k": k,
         "aggregates": _json_safe(aggregate_metrics(results)),
+        "perf": _json_safe(aggregate_perf(results)),
         "items": [_json_safe(asdict(r)) for r in results],
     }
     path.write_text(json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8")

@@ -35,6 +35,37 @@ def test_report_includes_aggregates_and_per_item_rows(tmp_path: Path) -> None:
     assert "| b |" in content
 
 
+def test_report_includes_perf_section_when_stats_captured(tmp_path: Path) -> None:
+    result = EvalResult(
+        item_id="a", question="q", actual_answer="a",
+        recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+        generation_stats={
+            "prompt_tokens": 1000.0, "prompt_eval_ms": 2000.0,
+            "output_tokens": 100.0, "generation_ms": 10000.0,
+        },
+    )
+    out_path = tmp_path / "report.md"
+    MarkdownReporter().write(
+        results=[result], config_summary="cfg", out_path=out_path
+    )
+    content = out_path.read_text()
+    assert "## Performance" in content
+    assert "prompt-eval tok/s" in content
+    assert "generation tok/s" in content
+
+
+def test_report_perf_section_notes_when_not_captured(tmp_path: Path) -> None:
+    out_path = tmp_path / "report.md"
+    MarkdownReporter().write(
+        results=[_make_result("a", 1.0, 1.0, 1.0)],
+        config_summary="cfg",
+        out_path=out_path,
+    )
+    content = out_path.read_text()
+    assert "## Performance" in content
+    assert "not captured" in content.lower()
+
+
 def test_report_includes_new_metric_aggregates(tmp_path: Path) -> None:
     results = [
         EvalResult(

@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 
 from rag_lab.agent.parser import ParseError, ReActParser
-from rag_lab.agent.tools import Tool
+from rag_lab.agent.tools import Tool, tool_call_schema
 from rag_lab.llms.base import LLM
 from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult
-from rag_lab.types import Chunk
+from rag_lab.types import Chunk, GenerationStats
 
 DEFAULT_AGENT_INSTRUCTIONS = """\
 You are a retrieval agent. Answer the user's question by gathering evidence with the \
@@ -23,6 +23,15 @@ Final Answer
 Do not write the answer itself — stop at "Final Answer" and the system will compose it.
 
 Available tools:
+"""
+
+STRUCTURED_STEP_INSTRUCTIONS = """\
+Respond with a single JSON object for the next step, with keys:
+- "thought": your reasoning
+- "action": one tool name, or "final_answer" when you have enough evidence
+- "action_input": the input for the tool (empty string for final_answer)
+
+Emit only the JSON object, nothing else.
 """
 
 
@@ -44,6 +53,8 @@ class AgentResult:
     final_context: list[Chunk]
     llm_calls: int = 0
     synthesis_prompt: str = ""
+    stats: list[GenerationStats] = field(default_factory=list)
+    parse_failures: int = 0
 
 
 def trace_dict(step: AgentStep) -> dict[str, str | None]:
@@ -57,12 +68,19 @@ def trace_dict(step: AgentStep) -> dict[str, str | None]:
 
 
 def _render_prompt(
-    question: str, tools: list[Tool], scratchpad: str, instructions: str
+    question: str,
+    tools: list[Tool],
+    scratchpad: str,
+    instructions: str,
+    *,
+    structured: bool = False,
 ) -> str:
     parts = [instructions]
     for tool in tools:
         parts.append(f"- {tool.name}: {tool.description}")
     parts.append("")
+    if structured:
+        parts.append(STRUCTURED_STEP_INSTRUCTIONS)
     parts.append(f"Question: {question}")
     if scratchpad:
         parts.append(scratchpad)
@@ -90,6 +108,7 @@ class Agent:
         max_steps: int = 6,
         final_k: int = 5,
         instructions: str | None = None,
+        structured_output: bool = False,
     ) -> None:
         if max_steps <= 0:
             raise ValueError("max_steps must be positive")
@@ -102,6 +121,8 @@ class Agent:
         self.max_steps = max_steps
         self.final_k = final_k
         self.instructions = instructions or DEFAULT_AGENT_INSTRUCTIONS
+        self.structured_output = structured_output
+        self._schema = tool_call_schema(self.tools) if structured_output else None
         self.parser = ReActParser()
 
     def run(self, question: str) -> AgentResult:
@@ -109,24 +130,39 @@ class Agent:
         steps: list[AgentStep] = []
         seen: list[Chunk] = []
         parse_failures = 0
+        total_parse_failures = 0
         llm_calls = 0
+        stats: list[GenerationStats] = []
 
         for _ in range(self.max_steps):
             prompt = _render_prompt(
-                question, self.tools, scratchpad, self.instructions
+                question,
+                self.tools,
+                scratchpad,
+                self.instructions,
+                structured=self.structured_output,
             )
-            text = self.llm.generate(prompt)
+            text = self.llm.generate(prompt, self._schema)
             llm_calls += 1
+            self._collect_stats(stats)
             try:
                 parsed = self.parser.parse(text)
             except ParseError:
                 parse_failures += 1
+                total_parse_failures += 1
                 if parse_failures >= 2:
                     break
-                reminder = (
-                    "Observation: Could not parse your step. Use 'Action: <tool>' and "
-                    "'Action Input: <text>', or 'Final Answer' when ready."
-                )
+                if self.structured_output:
+                    reminder = (
+                        "Observation: Could not parse your step. Emit only a single JSON "
+                        'object with keys "thought", "action" (a tool name or '
+                        '"final_answer"), and "action_input".'
+                    )
+                else:
+                    reminder = (
+                        "Observation: Could not parse your step. Use 'Action: <tool>' and "
+                        "'Action Input: <text>', or 'Final Answer' when ready."
+                    )
                 scratchpad += f"\n{reminder}\n"
                 continue
 
@@ -177,6 +213,7 @@ class Agent:
         chunks_seen = _dedupe(seen)
         final_context = chunks_seen[: self.final_k]
         answer, synthesis_prompt = self._synthesize(question, final_context)
+        self._collect_stats(stats)
         return AgentResult(
             answer=answer,
             steps=steps,
@@ -184,7 +221,14 @@ class Agent:
             final_context=final_context,
             llm_calls=llm_calls + 1,
             synthesis_prompt=synthesis_prompt,
+            stats=stats,
+            parse_failures=total_parse_failures,
         )
+
+    def _collect_stats(self, into: list[GenerationStats]) -> None:
+        stats = self.llm.last_stats()
+        if stats is not None:
+            into.append(stats)
 
     def _synthesize(self, question: str, chunks: list[Chunk]) -> tuple[str, str]:
         results = [

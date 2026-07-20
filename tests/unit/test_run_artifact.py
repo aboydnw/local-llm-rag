@@ -48,3 +48,36 @@ def test_write_run_then_read_round_trips(tmp_path: Path) -> None:
     assert data["aggregates"]["recall@k"] == 1.0
     assert data["items"][0]["retrieved"][0]["doc_path"] == "a.md"
     assert data["items"][0]["latency_ms"]["generate"] == 12.0
+
+
+def test_write_run_persists_perf_when_stats_captured(tmp_path: Path) -> None:
+    results = [
+        EvalResult(
+            item_id="x", question="q", actual_answer="a",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            generation_stats={
+                "prompt_tokens": 1000.0, "prompt_eval_ms": 2000.0,
+                "output_tokens": 100.0, "generation_ms": 10000.0,
+            },
+        )
+    ]
+    path = tmp_path / "run.json"
+    write_run(
+        path, results,
+        config_summary="cfg", prompt_version="0000", k=5, created_at="2026-06-29T00:00:00Z",
+    )
+    data = read_run(path)
+    assert data["perf"]["prompt_eval_tps_mean"] == 500.0
+    assert data["items"][0]["generation_stats"]["output_tokens"] == 100.0
+
+
+def test_read_run_loads_older_artifact_without_perf(tmp_path: Path) -> None:
+    path = tmp_path / "run.json"
+    path.write_text(
+        '{"schema_version": 1, "aggregates": {"recall@k": 1.0}, "items": '
+        '[{"item_id": "x", "recall_at_k": 1.0}]}',
+        encoding="utf-8",
+    )
+    data = read_run(path)
+    assert "perf" not in data
+    assert data["items"][0]["item_id"] == "x"

@@ -30,3 +30,33 @@ def aggregate_metrics(results: list[EvalResult]) -> dict[str, float]:
         if vals:
             agg[key] = statistics.mean(vals)
     return agg
+
+
+def _percentile(values: list[float], q: float) -> float:
+    ordered = sorted(values)
+    index = max(0, math.ceil(q * len(ordered)) - 1)
+    return ordered[index]
+
+
+def _tps(tokens: float, ms: float) -> float:
+    return tokens / (ms / 1000.0) if ms else 0.0
+
+
+def aggregate_perf(results: list[EvalResult]) -> dict[str, float]:
+    """Mean/p50/p95 throughput and latency across results that captured stats."""
+    captured = [r.generation_stats for r in results if r.generation_stats]
+    if not captured:
+        return {}
+    series = {
+        "prompt_eval_tps": [
+            _tps(s["prompt_tokens"], s["prompt_eval_ms"]) for s in captured
+        ],
+        "generation_tps": [_tps(s["output_tokens"], s["generation_ms"]) for s in captured],
+        "total_ms": [s["prompt_eval_ms"] + s["generation_ms"] for s in captured],
+    }
+    agg: dict[str, float] = {}
+    for name, values in series.items():
+        agg[f"{name}_mean"] = statistics.mean(values)
+        agg[f"{name}_p50"] = _percentile(values, 0.50)
+        agg[f"{name}_p95"] = _percentile(values, 0.95)
+    return agg

@@ -12,6 +12,9 @@ class FakeLLM:
     def generate(self, prompt: str) -> str:
         return "The alpha document is about tiles."
 
+    def last_stats(self):
+        return None
+
 
 def _corpus(tmp_path):
     d = tmp_path / "corpus"
@@ -100,6 +103,38 @@ def test_aggregate_scores_includes_agent_metrics():
     ]
     scores = experiments._aggregate_scores(results)
     assert scores["tool_calls"] == 3.0
+
+
+def test_aggregate_scores_includes_perf_when_stats_captured():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            generation_stats={
+                "prompt_tokens": 1000.0, "prompt_eval_ms": 2000.0,
+                "output_tokens": 100.0, "generation_ms": 10000.0,
+            },
+        )
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert scores["prompt_eval_tps_mean"] == 500.0
+    assert scores["generation_tps_mean"] == 10.0
+    assert "total_ms_p50" in scores
+
+
+def test_aggregate_scores_omits_perf_without_stats():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+        )
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert not any(k.startswith("prompt_eval_tps") for k in scores)
 
 
 def test_run_eval_persists_run(tmp_path):

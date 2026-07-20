@@ -156,6 +156,94 @@ def test_agent_records_step_prompt_and_synthesis_prompt():
     assert "hit" in result.synthesis_prompt
 
 
+def test_agent_structured_output_passes_schema_and_parses_json():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="found", chunks=[_chunk("hit")])
+    )
+    llm = ScriptedLLM(
+        [
+            '{"thought": "search", "action": "vector_search", "action_input": "q"}',
+            '{"thought": "done", "action": "final_answer", "action_input": ""}',
+            "the answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool], structured_output=True)
+    result = agent.run("question")
+    assert tool.calls == ["q"]
+    assert result.answer == "the answer"
+    assert llm.schemas[0] is not None
+    assert llm.schemas[0]["properties"]["action"]["enum"] == [
+        "vector_search",
+        "final_answer",
+    ]
+    assert llm.schemas[-1] is None
+
+
+def test_agent_free_text_mode_passes_no_schema():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        ["Action: vector_search\nAction Input: q", "Final Answer", "answer"]
+    )
+    agent = Agent(llm=llm, tools=[tool])
+    agent.run("q")
+    assert all(s is None for s in llm.schemas)
+
+
+def test_agent_counts_total_parse_failures():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "I will just chat.",
+            "Action: vector_search\nAction Input: q",
+            "I will just chat again.",
+            "Thought: done\nFinal Answer",
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool], max_steps=6)
+    result = agent.run("q")
+    assert result.parse_failures == 2
+
+
+def test_agent_structured_parse_failure_retries_with_json_reminder():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "not json",
+            '{"thought": "done", "action": "final_answer", "action_input": ""}',
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool], structured_output=True, max_steps=6)
+    agent.run("q")
+    retry_prompt = llm.prompts[1]
+    assert "JSON object" in retry_prompt
+    assert "Action: <tool>" not in retry_prompt
+
+
+def test_agent_collects_stats_for_every_llm_call():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "Thought: search\nAction: vector_search\nAction Input: q",
+            "Thought: done\nFinal Answer",
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool])
+    result = agent.run("q")
+    assert len(result.stats) == result.llm_calls == 3
+    assert all(s.output_tokens > 0 for s in result.stats)
+
+
 def test_trace_dict_omits_chunks():
     from rag_lab.agent.agent import AgentStep, trace_dict
 
