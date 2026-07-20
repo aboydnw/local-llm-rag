@@ -209,6 +209,24 @@ def test_agent_counts_total_parse_failures():
     assert result.parse_failures == 2
 
 
+def test_agent_structured_parse_failure_retries_with_json_reminder():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "not json",
+            '{"thought": "done", "action": "final_answer", "action_input": ""}',
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool], structured_output=True, max_steps=6)
+    agent.run("q")
+    retry_prompt = llm.prompts[1]
+    assert "JSON object" in retry_prompt
+    assert "Action: <tool>" not in retry_prompt
+
+
 def test_agent_collects_stats_for_every_llm_call():
     tool = _RecordingTool(
         "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])

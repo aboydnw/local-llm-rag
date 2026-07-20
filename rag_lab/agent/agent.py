@@ -152,10 +152,17 @@ class Agent:
                 total_parse_failures += 1
                 if parse_failures >= 2:
                     break
-                reminder = (
-                    "Observation: Could not parse your step. Use 'Action: <tool>' and "
-                    "'Action Input: <text>', or 'Final Answer' when ready."
-                )
+                if self.structured_output:
+                    reminder = (
+                        "Observation: Could not parse your step. Emit only a single JSON "
+                        'object with keys "thought", "action" (a tool name or '
+                        '"final_answer"), and "action_input".'
+                    )
+                else:
+                    reminder = (
+                        "Observation: Could not parse your step. Use 'Action: <tool>' and "
+                        "'Action Input: <text>', or 'Final Answer' when ready."
+                    )
                 scratchpad += f"\n{reminder}\n"
                 continue
 
