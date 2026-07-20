@@ -97,6 +97,36 @@ def test_missing_metadata_leaves_stats_none(monkeypatch: pytest.MonkeyPatch) -> 
     assert llm.last_stats() is None
 
 
+def test_think_setting_is_passed_to_chat(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = {}
+
+    def fake_chat(model: str, messages: list[dict], stream: bool = False, **kwargs):
+        seen.update(kwargs)
+        yield {"message": {"content": "hi"}, "done": True}
+
+    monkeypatch.setattr(
+        "rag_lab.llms.ollama._client",
+        lambda: type("C", (), {"chat": staticmethod(fake_chat)})(),
+    )
+    OllamaLLM(model="qwen3:4b", think=False).generate("q")
+    assert seen["think"] is False
+
+
+def test_think_none_is_omitted_from_chat(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = {}
+
+    def fake_chat(model: str, messages: list[dict], stream: bool = False, **kwargs):
+        seen.update(kwargs)
+        yield {"message": {"content": "hi"}, "done": True}
+
+    monkeypatch.setattr(
+        "rag_lab.llms.ollama._client",
+        lambda: type("C", (), {"chat": staticmethod(fake_chat)})(),
+    )
+    OllamaLLM(model="llama3.2:3b").generate("q")
+    assert "think" not in seen
+
+
 def test_new_stream_resets_previous_stats(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {"n": 0}
 

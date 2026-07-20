@@ -32,8 +32,9 @@ def _extract_stats(chunk: object) -> GenerationStats | None:
 
 
 class OllamaLLM:
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, think: bool | None = None) -> None:
         self.model = model
+        self.think = think
         self._last_stats: GenerationStats | None = None
 
     def generate(self, prompt: str, schema: dict | None = None) -> str:
@@ -44,6 +45,8 @@ class OllamaLLM:
         kwargs: dict = {}
         if schema is not None:
             kwargs["format"] = schema
+        if self.think is not None:
+            kwargs["think"] = self.think
         for chunk in _client().chat(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],

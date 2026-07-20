@@ -24,6 +24,9 @@ class EmbedderConfig(BaseModel):
 class LLMConfig(BaseModel):
     type: Literal["ollama"] = "ollama"
     model: str = "llama3.2:3b"
+    think: bool | None = None
+    """Thinking-mode toggle for reasoning models (e.g. Qwen3). None leaves the
+    model default; False disables thinking to cut latency and answer pollution."""
 
 
 class RetrieverConfig(BaseModel):

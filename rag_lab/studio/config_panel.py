@@ -97,6 +97,12 @@ def _render_agent_knobs(cfg: Config) -> None:
         help="Which tools the agent may call. Try removing one and watch how its strategy changes.",
     )
     cfg.agent.tools = chosen or ["vector_search"]
+    cfg.agent.structured_output = st.checkbox(
+        "structured output (constrained JSON tool calls)",
+        value=cfg.agent.structured_output,
+        help="Force tool-call turns through a JSON schema via Ollama's format param. "
+        "Cuts parse failures on smaller models; watch the parse-failure metric to compare.",
+    )
 
     def _reset_agent_prompt() -> None:
         st.session_state["agent_instructions"] = DEFAULT_AGENT_INSTRUCTIONS

@@ -72,7 +72,7 @@ def build_chunker(config: Config, embedder=None) -> Chunker:
 
 
 def build_llm(config: Config) -> OllamaLLM:
-    return OllamaLLM(model=config.llm.model)
+    return OllamaLLM(model=config.llm.model, think=config.llm.think)
 
 
 def build_store(config: Config, db: Path) -> SqliteVecStore:

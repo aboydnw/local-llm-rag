@@ -1,0 +1,35 @@
+# Bake-off candidate: phi4-mini (Q4_K_M default from `ollama pull phi4-mini`).
+#
+# phi4-mini has no thinking mode, so no `think` toggle is needed. Everything except
+# the llm block matches the current default so the only variable under test is the
+# generator model.
+chunker:
+  type: markdown_aware
+  max_tokens: 512
+  overlap: 50
+  context_header: true
+embedder:
+  type: ollama
+  model: nomic-embed-text
+llm:
+  type: ollama
+  model: phi4-mini
+retriever:
+  type: hybrid
+  bm25_weight: 0.5
+  vector_weight: 0.5
+  k: 5
+  reranker: none
+  rerank_candidates: 30
+eval:
+  deepeval: false
+agent:
+  enabled: false
+  max_steps: 6
+  final_k: 5
+  structured_output: false
+  tools:
+    - vector_search
+    - keyword_search
+    - list_documents
+    - fetch_document
