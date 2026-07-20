@@ -43,10 +43,16 @@ class _StubLLM:
     def generate(self, prompt: str) -> str:
         return "factory class MosaicTilerFactory is the answer"
 
+    def last_stats(self):
+        return None
+
 
 class _CitingLLM:
     def generate(self, prompt: str) -> str:
         return "MosaicTilerFactory does this [1]."
+
+    def last_stats(self):
+        return None
 
 
 def test_runner_captures_retrieved_refs_citations_and_latency() -> None:
@@ -128,6 +134,9 @@ def test_runner_uses_provided_prompt_builder() -> None:
         def generate(self, prompt: str) -> str:
             seen["prompt"] = prompt
             return "ok"
+
+        def last_stats(self):
+            return None
 
     runner = EvalRunner(
         retriever=_StubRetriever(["a.md"]),
@@ -222,6 +231,31 @@ def test_non_agent_eval_leaves_agent_fields_empty():
     (res,) = runner.run([GoldenItem(id="x", question="q")])
     assert res.agent_metrics == {}
     assert res.agent_tools_used == ()
+
+
+def test_non_agent_eval_records_generation_stats():
+    from rag_lab.types import GenerationStats
+
+    class _StatsLLM:
+        def generate(self, prompt: str) -> str:
+            return "answer"
+
+        def last_stats(self):
+            return GenerationStats(
+                prompt_tokens=500, prompt_eval_ms=1000.0,
+                output_tokens=50, generation_ms=2000.0,
+            )
+
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StatsLLM(), k=1)
+    (res,) = runner.run([GoldenItem(id="x", question="q")])
+    assert res.generation_stats["prompt_tokens"] == 500.0
+    assert res.generation_stats["generation_ms"] == 2000.0
+
+
+def test_stats_llm_none_leaves_generation_stats_none():
+    runner = EvalRunner(retriever=_StubRetriever(["a.md"]), llm=_StubLLM(), k=1)
+    (res,) = runner.run([GoldenItem(id="x", question="q")])
+    assert res.generation_stats is None
 
 
 def test_eval_result_records_agent_trace_for_agent_runs():

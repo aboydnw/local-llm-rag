@@ -8,6 +8,7 @@ import yaml
 
 from rag_lab.config import Config, config_summary
 from rag_lab.eval import golden_set as golden_set_mod
+from rag_lab.eval.aggregate import aggregate_perf
 from rag_lab.eval.reporter import MarkdownReporter
 from rag_lab.eval.run_artifact import prompt_version as artifact_prompt_version
 from rag_lab.eval.run_artifact import read_run, write_run
@@ -50,6 +51,10 @@ def _aggregate_scores(results) -> dict[str, float]:
         vals = [r.agent_metrics[key] for r in results if key in r.agent_metrics]
         if vals:
             scores[key] = statistics.mean(vals)
+    perf = aggregate_perf(results)
+    for key in ("prompt_eval_tps_mean", "generation_tps_mean", "total_ms_p50"):
+        if key in perf:
+            scores[key] = perf[key]
     return scores
 
 

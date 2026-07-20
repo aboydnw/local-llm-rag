@@ -1,4 +1,4 @@
-from rag_lab.eval.aggregate import aggregate_metrics
+from rag_lab.eval.aggregate import aggregate_metrics, aggregate_perf
 from rag_lab.eval.runner import EvalResult
 
 
@@ -44,3 +44,32 @@ def test_aggregate_includes_mean_agent_metrics() -> None:
 def test_aggregate_without_agent_metrics_unchanged() -> None:
     agg = aggregate_metrics([_agent_r({})])
     assert "tool_calls" not in agg
+
+
+def _perf_r(prompt_tokens, prompt_eval_ms, output_tokens, generation_ms) -> EvalResult:
+    return EvalResult(
+        item_id="x", question="q", actual_answer="a",
+        recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+        generation_stats={
+            "prompt_tokens": prompt_tokens,
+            "prompt_eval_ms": prompt_eval_ms,
+            "output_tokens": output_tokens,
+            "generation_ms": generation_ms,
+        },
+    )
+
+
+def test_aggregate_perf_computes_throughput_and_latency() -> None:
+    results = [
+        _perf_r(1000, 2000.0, 100, 10000.0),
+        _perf_r(2000, 2000.0, 200, 10000.0),
+    ]
+    perf = aggregate_perf(results)
+    assert perf["prompt_eval_tps_mean"] == 750.0
+    assert perf["generation_tps_p50"] == 10.0
+    assert perf["generation_tps_p95"] == 20.0
+    assert perf["total_ms_mean"] == 12000.0
+
+
+def test_aggregate_perf_empty_when_no_stats_captured() -> None:
+    assert aggregate_perf([_agent_r({})]) == {}
