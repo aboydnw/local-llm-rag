@@ -99,6 +99,7 @@ class EvalRunner:
                     "mrr_seen": mrr(seen, item.ideal_docs),
                     "tool_calls": float(len(tool_steps)),
                     "llm_calls": float(agent_result.llm_calls),
+                    "parse_failures": float(agent_result.parse_failures),
                 }
                 agent_tools_used = tuple(sorted({s.action for s in tool_steps}))
                 agent_trace = [trace_dict(s) for s in agent_result.steps]

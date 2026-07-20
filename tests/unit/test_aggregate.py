@@ -73,3 +73,12 @@ def test_aggregate_perf_computes_throughput_and_latency() -> None:
 
 def test_aggregate_perf_empty_when_no_stats_captured() -> None:
     assert aggregate_perf([_agent_r({})]) == {}
+
+
+def test_aggregate_includes_mean_parse_failures() -> None:
+    results = [
+        _agent_r({"parse_failures": 0.0}),
+        _agent_r({"parse_failures": 2.0}),
+    ]
+    agg = aggregate_metrics(results)
+    assert agg["parse_failures"] == 1.0

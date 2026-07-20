@@ -200,6 +200,7 @@ def _agent_result():
         chunks_seen=[noise, good],
         final_context=[good],
         llm_calls=3,
+        parse_failures=2,
     )
 
 
@@ -221,6 +222,7 @@ def test_agent_eval_scores_final_context_and_records_agent_metrics():
     assert res.agent_metrics["mrr_seen"] == 0.5
     assert res.agent_metrics["tool_calls"] == 1.0
     assert res.agent_metrics["llm_calls"] == 3.0
+    assert res.agent_metrics["parse_failures"] == 2.0
     assert res.agent_tools_used == ("vector_search",)
     assert "agent" in res.latency_ms
     assert [r.doc_path for r in res.retrieved] == ["docs/right.md"]
