@@ -5,6 +5,7 @@ from rag_lab.agent.tools import (
     ListDocumentsTool,
     SearchTool,
     ToolResult,
+    tool_call_schema,
 )
 from rag_lab.retrievers.base import RetrievalResult
 from rag_lab.types import Chunk
@@ -109,3 +110,19 @@ def test_fetch_document_tool_backend_error_is_recoverable():
     result = tool.run("g.md")
     assert result.chunks == []
     assert result.observation.startswith("Error:")
+
+
+class _NamedTool:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.description = "t"
+
+    def run(self, arg: str) -> ToolResult:
+        return ToolResult(observation="", chunks=[])
+
+
+def test_tool_call_schema_enumerates_tool_names_plus_final_answer():
+    schema = tool_call_schema([_NamedTool("vector_search"), _NamedTool("fetch_document")])
+    enum = schema["properties"]["action"]["enum"]
+    assert enum == ["vector_search", "fetch_document", "final_answer"]
+    assert schema["required"] == ["thought", "action"]

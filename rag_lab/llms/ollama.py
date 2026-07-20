@@ -36,15 +36,19 @@ class OllamaLLM:
         self.model = model
         self._last_stats: GenerationStats | None = None
 
-    def generate(self, prompt: str) -> str:
-        return "".join(self.stream(prompt))
+    def generate(self, prompt: str, schema: dict | None = None) -> str:
+        return "".join(self.stream(prompt, schema))
 
-    def stream(self, prompt: str) -> Iterator[str]:
+    def stream(self, prompt: str, schema: dict | None = None) -> Iterator[str]:
         self._last_stats = None
+        kwargs: dict = {}
+        if schema is not None:
+            kwargs["format"] = schema
         for chunk in _client().chat(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
+            **kwargs,
         ):
             piece = chunk["message"]["content"]
             if piece:

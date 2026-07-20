@@ -48,6 +48,7 @@ class AgentConfig(BaseModel):
     enabled: bool = False
     max_steps: int = Field(default=6, gt=0)
     final_k: int = Field(default=5, gt=0)
+    structured_output: bool = False
     instructions: str = DEFAULT_AGENT_INSTRUCTIONS
     tools: list[
         Literal[
@@ -131,6 +132,7 @@ agent:
   enabled: false
   max_steps: 6
   final_k: 5
+  structured_output: false
   tools:
     - vector_search
     - keyword_search

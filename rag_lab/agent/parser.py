@@ -1,5 +1,8 @@
+import json
 import re
 from dataclasses import dataclass
+
+from rag_lab.agent.tools import FINAL_ANSWER_ACTION
 
 _THOUGHT = re.compile(r"Thought:\s*(.*?)(?=\n(?:Action|Final Answer)|\Z)", re.DOTALL)
 _ACTION = re.compile(r"Action:\s*([A-Za-z_]+)")
@@ -20,6 +23,35 @@ class ParsedStep:
 
 class ReActParser:
     def parse(self, text: str) -> ParsedStep:
+        parsed = self._parse_json(text)
+        if parsed is not None:
+            return parsed
+        return self._parse_freetext(text)
+
+    def _parse_json(self, text: str) -> ParsedStep | None:
+        stripped = text.strip()
+        if not stripped.startswith("{"):
+            return None
+        try:
+            data = json.loads(stripped)
+        except (ValueError, TypeError):
+            return None
+        if not isinstance(data, dict) or "action" not in data:
+            return None
+        action = data["action"]
+        thought = str(data.get("thought", "")).strip()
+        if action == FINAL_ANSWER_ACTION:
+            return ParsedStep(
+                thought=thought, action=None, action_input="", is_final=True
+            )
+        return ParsedStep(
+            thought=thought,
+            action=str(action).strip(),
+            action_input=str(data.get("action_input", "")).strip(),
+            is_final=False,
+        )
+
+    def _parse_freetext(self, text: str) -> ParsedStep:
         thought_match = _THOUGHT.search(text)
         thought = thought_match.group(1).strip() if thought_match else ""
 

@@ -14,6 +14,23 @@ KEYWORD_SEARCH_DESCRIPTION = (
 )
 
 
+FINAL_ANSWER_ACTION = "final_answer"
+
+
+def tool_call_schema(tools: list["Tool"]) -> dict:
+    """JSON schema for one ReAct step, constraining `action` to the given tools."""
+    actions = [tool.name for tool in tools] + [FINAL_ANSWER_ACTION]
+    return {
+        "type": "object",
+        "properties": {
+            "thought": {"type": "string"},
+            "action": {"type": "string", "enum": actions},
+            "action_input": {"type": "string"},
+        },
+        "required": ["thought", "action"],
+    }
+
+
 @dataclass(frozen=True)
 class ToolResult:
     observation: str

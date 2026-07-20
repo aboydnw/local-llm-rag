@@ -134,6 +134,7 @@ def build_agent(store: SqliteVecStore, embedder, config: Config) -> Agent:
         max_steps=config.agent.max_steps,
         final_k=config.agent.final_k,
         instructions=config.agent.instructions,
+        structured_output=config.agent.structured_output,
     )
 
 

@@ -19,10 +19,10 @@ class FakeLLM:
         self.reply = reply
         self._last_stats: GenerationStats | None = None
 
-    def generate(self, prompt: str) -> str:
-        return "".join(self.stream(prompt))
+    def generate(self, prompt: str, schema: dict | None = None) -> str:
+        return "".join(self.stream(prompt, schema))
 
-    def stream(self, prompt: str) -> Iterator[str]:
+    def stream(self, prompt: str, schema: dict | None = None) -> Iterator[str]:
         self._last_stats = _fake_stats(prompt, self.reply)
         words = self.reply.split(" ")
         for i, word in enumerate(words):
@@ -42,18 +42,20 @@ class ScriptedLLM:
     def __init__(self, replies: list[str]) -> None:
         self.replies = list(replies)
         self.prompts: list[str] = []
+        self.schemas: list[dict | None] = []
         self._index = 0
         self._last_stats: GenerationStats | None = None
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str, schema: dict | None = None) -> str:
         self.prompts.append(prompt)
+        self.schemas.append(schema)
         reply = self.replies[self._index]
         self._index += 1
         self._last_stats = _fake_stats(prompt, reply)
         return reply
 
-    def stream(self, prompt: str) -> Iterator[str]:
-        yield self.generate(prompt)
+    def stream(self, prompt: str, schema: dict | None = None) -> Iterator[str]:
+        yield self.generate(prompt, schema)
 
     def last_stats(self) -> GenerationStats | None:
         return self._last_stats
