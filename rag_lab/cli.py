@@ -113,12 +113,34 @@ def ingest(
             workdir.cleanup()
 
 
+def _format_stats_line(stats) -> str:
+    return (
+        f"prompt {stats.prompt_tokens:,} tok @ {stats.prompt_eval_tps:.1f} tok/s "
+        f"({stats.prompt_eval_ms / 1000:.1f}s) · "
+        f"gen {stats.output_tokens:,} tok @ {stats.generation_tps:.1f} tok/s "
+        f"({stats.generation_ms / 1000:.1f}s)"
+    )
+
+
+def _echo_stats(stats, llm_calls: int | None = None) -> None:
+    typer.echo("")
+    typer.echo("--- Stats ---")
+    if stats is None:
+        typer.echo("No generation stats captured (LLM did not report timing metadata).")
+        return
+    line = _format_stats_line(stats)
+    if llm_calls is not None:
+        line += f" · {llm_calls} llm calls"
+    typer.echo(line)
+
+
 def _run_agent(
     question: str,
     store,
     embedder,
     cfg: config_mod.Config,
     show_trace: bool,
+    show_stats: bool = False,
 ) -> None:
     try:
         agent = pipeline.build_agent(store, embedder, cfg)
@@ -140,6 +162,10 @@ def _run_agent(
     typer.echo("--- Sources ---")
     for i, chunk in enumerate(result.final_context, start=1):
         typer.echo(f"[{i}] {chunk.doc_path} — {' > '.join(chunk.heading_path)}")
+    if show_stats:
+        from rag_lab.types import combine_stats
+
+        _echo_stats(combine_stats(result.stats), llm_calls=result.llm_calls)
 
 
 @app.command()
@@ -160,6 +186,9 @@ def ask(
     show_trace: bool = typer.Option(
         False, "--show-trace", help="Print the agent's reasoning trace (agent mode only)."
     ),
+    stats: bool = typer.Option(
+        False, "--stats", help="Print prompt-eval and generation throughput after the answer."
+    ),
 ) -> None:
     """Ask a question against an ingested corpus."""
     if not db.exists():
@@ -179,7 +208,7 @@ def ask(
     if use_agent or cfg.agent.enabled:
         if k:
             cfg.retriever.k = k
-        _run_agent(question, store, embedder, cfg, show_trace)
+        _run_agent(question, store, embedder, cfg, show_trace, show_stats=stats)
         return
     retriever = pipeline.build_retriever(store, embedder, cfg)
     llm = pipeline.build_llm(cfg)
@@ -205,6 +234,8 @@ def ask(
     typer.echo("--- Sources ---")
     for i, r in enumerate(results, start=1):
         typer.echo(f"[{i}] {r.chunk.doc_path} — {' > '.join(r.chunk.heading_path)}")
+    if stats:
+        _echo_stats(llm.last_stats())
 
 
 @inspect_app.command("chunks")

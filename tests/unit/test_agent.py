@@ -156,6 +156,23 @@ def test_agent_records_step_prompt_and_synthesis_prompt():
     assert "hit" in result.synthesis_prompt
 
 
+def test_agent_collects_stats_for_every_llm_call():
+    tool = _RecordingTool(
+        "vector_search", ToolResult(observation="ok", chunks=[_chunk("c")])
+    )
+    llm = ScriptedLLM(
+        [
+            "Thought: search\nAction: vector_search\nAction Input: q",
+            "Thought: done\nFinal Answer",
+            "answer",
+        ]
+    )
+    agent = Agent(llm=llm, tools=[tool])
+    result = agent.run("q")
+    assert len(result.stats) == result.llm_calls == 3
+    assert all(s.output_tokens > 0 for s in result.stats)
+
+
 def test_trace_dict_omits_chunks():
     from rag_lab.agent.agent import AgentStep, trace_dict
 

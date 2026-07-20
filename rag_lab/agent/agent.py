@@ -5,7 +5,7 @@ from rag_lab.agent.tools import Tool
 from rag_lab.llms.base import LLM
 from rag_lab.prompts import PromptBuilder
 from rag_lab.retrievers.base import RetrievalResult
-from rag_lab.types import Chunk
+from rag_lab.types import Chunk, GenerationStats
 
 DEFAULT_AGENT_INSTRUCTIONS = """\
 You are a retrieval agent. Answer the user's question by gathering evidence with the \
@@ -44,6 +44,7 @@ class AgentResult:
     final_context: list[Chunk]
     llm_calls: int = 0
     synthesis_prompt: str = ""
+    stats: list[GenerationStats] = field(default_factory=list)
 
 
 def trace_dict(step: AgentStep) -> dict[str, str | None]:
@@ -110,6 +111,7 @@ class Agent:
         seen: list[Chunk] = []
         parse_failures = 0
         llm_calls = 0
+        stats: list[GenerationStats] = []
 
         for _ in range(self.max_steps):
             prompt = _render_prompt(
@@ -117,6 +119,7 @@ class Agent:
             )
             text = self.llm.generate(prompt)
             llm_calls += 1
+            self._collect_stats(stats)
             try:
                 parsed = self.parser.parse(text)
             except ParseError:
@@ -177,6 +180,7 @@ class Agent:
         chunks_seen = _dedupe(seen)
         final_context = chunks_seen[: self.final_k]
         answer, synthesis_prompt = self._synthesize(question, final_context)
+        self._collect_stats(stats)
         return AgentResult(
             answer=answer,
             steps=steps,
@@ -184,7 +188,13 @@ class Agent:
             final_context=final_context,
             llm_calls=llm_calls + 1,
             synthesis_prompt=synthesis_prompt,
+            stats=stats,
         )
+
+    def _collect_stats(self, into: list[GenerationStats]) -> None:
+        stats = self.llm.last_stats()
+        if stats is not None:
+            into.append(stats)
 
     def _synthesize(self, question: str, chunks: list[Chunk]) -> tuple[str, str]:
         results = [
