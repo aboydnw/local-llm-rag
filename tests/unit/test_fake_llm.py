@@ -1,3 +1,4 @@
+from rag_lab.llms.base import LLM
 from rag_lab.llms.fake import FakeLLM, ScriptedLLM
 
 
@@ -21,3 +22,29 @@ def test_scripted_llm_records_prompts():
     llm = ScriptedLLM(["x"])
     llm.generate("the prompt")
     assert llm.prompts == ["the prompt"]
+
+
+def test_fakes_satisfy_llm_protocol():
+    fake: LLM = FakeLLM("x")
+    scripted: LLM = ScriptedLLM(["x"])
+    assert fake.last_stats() is None
+    assert scripted.last_stats() is None
+
+
+def test_fake_llm_stats_are_deterministic():
+    llm = FakeLLM("one two three")
+    llm.generate("a four word prompt")
+    stats = llm.last_stats()
+    assert stats is not None
+    assert stats.prompt_tokens == 4
+    assert stats.output_tokens == 3
+    assert llm.generate("a four word prompt") and llm.last_stats() == stats
+
+
+def test_scripted_llm_stats_track_last_call():
+    llm = ScriptedLLM(["one two", "one two three"])
+    llm.generate("p1")
+    assert llm.last_stats().output_tokens == 2
+    llm.generate("p2 p2")
+    assert llm.last_stats().output_tokens == 3
+    assert llm.last_stats().prompt_tokens == 2
