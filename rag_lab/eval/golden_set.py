@@ -1,3 +1,5 @@
+import os
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -20,8 +22,21 @@ def append_golden_case(path: Path, item: GoldenItem) -> None:
         raise ValueError(f"duplicate golden id: {item.id}")
     entries = [i.model_dump(exclude_defaults=True) | {"id": i.id, "question": i.question}
                for i in [*existing, item]]
-    path.write_text(yaml.safe_dump(entries, sort_keys=False, allow_unicode=True))
+    _atomic_write(path, yaml.safe_dump(entries, sort_keys=False, allow_unicode=True))
     load_golden_set(path)
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write via a temp file + os.replace so an interruption can't corrupt the target."""
+    directory = path.parent or Path(".")
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def load_golden_set(path: Path) -> list[GoldenItem]:

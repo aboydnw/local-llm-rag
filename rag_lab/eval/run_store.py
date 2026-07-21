@@ -63,7 +63,7 @@ def git_sha() -> str | None:
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True, text=True, timeout=5, check=False,
         )
-    except OSError:
+    except (OSError, subprocess.SubprocessError):
         return None
     sha = out.stdout.strip()
     return sha if out.returncode == 0 and sha else None

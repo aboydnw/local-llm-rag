@@ -1,3 +1,7 @@
+import math
+
+import pytest
+
 from rag_lab.eval.aggregate import aggregate_metrics, aggregate_perf, aggregate_repeats
 from rag_lab.eval.runner import EvalResult
 
@@ -112,7 +116,7 @@ def test_aggregate_repeats_means_and_stdev_across_passes() -> None:
     repeats = [[_r(1.0, 1.0, 1.0, None)], [_r(0.0, 0.0, 0.0, None)]]
     means, stds = aggregate_repeats(repeats)
     assert means["recall@k"] == 0.5
-    assert stds["recall@k"] > 0.0
+    assert stds["recall@k"] == pytest.approx(math.sqrt(0.5))
 
 
 def test_aggregate_repeats_single_pass_has_no_stdev() -> None:

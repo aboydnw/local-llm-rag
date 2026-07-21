@@ -1,4 +1,5 @@
 import json
+import math
 
 import pytest
 
@@ -41,18 +42,18 @@ def test_save_run_persists_files_and_scores(tmp_path):
 
 
 def test_save_run_records_provenance(tmp_path):
-    runs_dir, record = _save(tmp_path, "r1")
+    runs_dir, _ = _save(tmp_path, "r1")
     data = json.loads((runs_dir / "r1" / "run.json").read_text())
     assert data["provenance"]["golden_hash"] == "abc123"
     assert data["provenance"]["config_hash"] == run_store.config_hash(Config())
 
 
 def test_save_run_repeat_scores_are_means_with_std(tmp_path):
-    runs_dir, record = _save(
+    _, record = _save(
         tmp_path, "r1", repeats=[[_result(1.0)], [_result(0.0)]]
     )
     assert record.scores["recall@k"] == 0.5
-    assert record.scores_std["recall@k"] > 0.0
+    assert record.scores_std["recall@k"] == pytest.approx(math.sqrt(0.5))
     assert record.repeat == 2
 
 
