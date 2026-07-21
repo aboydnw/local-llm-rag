@@ -60,3 +60,11 @@ addopts = "-v --strict-markers"
 markers = [
     "integration: marks integration tests requiring Ollama",
 ]
+
+[tool.uv.sources]
+streamlit-testing-feedback = { path = "../streamlit-testing-feedback", editable = true }
+
+[dependency-groups]
+dev = [
+    "streamlit-testing-feedback",
+]
