@@ -65,6 +65,6 @@ markers = [
 streamlit-testing-feedback = { path = "../streamlit-testing-feedback", editable = true }
 
 [dependency-groups]
-dev = [
+feedback = [
     "streamlit-testing-feedback",
 ]

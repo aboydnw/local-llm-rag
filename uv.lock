@@ -2283,7 +2283,7 @@ studio = [
 ]
 
 [package.dev-dependencies]
-dev = [
+feedback = [
     { name = "streamlit-testing-feedback" },
 ]
 
@@ -2308,7 +2308,7 @@ requires-dist = [
 provides-extras = ["dev", "studio", "deepeval", "mcp"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "streamlit-testing-feedback", editable = "../streamlit-testing-feedback" }]
+feedback = [{ name = "streamlit-testing-feedback", editable = "../streamlit-testing-feedback" }]
 
 [[package]]
 name = "rank-bm25"
