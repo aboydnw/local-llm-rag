@@ -21,6 +21,7 @@ class RetrievedRef:
     heading_path: tuple[str, ...]
     position: int
     score: float
+    text: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +136,7 @@ class EvalRunner:
                     heading_path=tuple(r.chunk.heading_path),
                     position=r.chunk.position,
                     score=r.score,
+                    text=r.chunk.text,
                 )
                 for rank, r in enumerate(results, start=1)
             ]
