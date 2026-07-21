@@ -37,6 +37,23 @@ def aggregate_metrics(results: list[EvalResult]) -> dict[str, float]:
     return agg
 
 
+def aggregate_repeats(
+    repeats: list[list[EvalResult]],
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Mean (and, for 2+ repeats, sample stdev) of each metric across repeat passes."""
+    per_repeat = [aggregate_metrics(results) for results in repeats if results]
+    if not per_repeat:
+        return {}, {}
+    means: dict[str, float] = {}
+    stds: dict[str, float] = {}
+    for key in sorted({k for agg in per_repeat for k in agg}):
+        values = [agg[key] for agg in per_repeat if key in agg]
+        means[key] = statistics.mean(values)
+        if len(values) > 1:
+            stds[key] = statistics.stdev(values)
+    return means, stds
+
+
 def _percentile(values: list[float], q: float) -> float:
     ordered = sorted(values)
     index = max(0, math.ceil(q * len(ordered)) - 1)

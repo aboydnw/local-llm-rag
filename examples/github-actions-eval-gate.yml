@@ -1,0 +1,43 @@
+# Example: fail a PR when the RAG eval regresses past the gates in rag.yml.
+#
+# Illustrative, not enabled for rag-lab itself: the eval needs an Ollama server,
+# so this only works on a self-hosted runner (or a job that installs Ollama and
+# pulls the models — slow, but shown below). Copy into .github/workflows/ and
+# adapt paths/models to your corpus.
+#
+# The gate itself is just the eval's exit code: with `eval.gates` configured in
+# rag.yml, any gated metric dropping more than its threshold exits 2 and fails
+# the job.
+#
+# CI needs a baseline to compare against. `.rag-lab/runs/` is gitignored, so the
+# pinned baseline is NOT in a fresh checkout — pass an explicit baseline artifact
+# instead. Commit one to the repo (copy a good run's `run.json` to
+# `eval-baseline.json` and check it in) and hand it to `--baseline` below; refresh
+# it when you intentionally move the metrics. Alternatively restore the pinned
+# `.rag-lab/runs/` from a cache/artifact before the eval step and drop `--baseline`.
+
+name: eval-gate
+
+on:
+  pull_request:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest # prefer a self-hosted runner with Ollama already up
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - name: Install Ollama and pull models
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+          ollama pull nomic-embed-text
+          ollama pull qwen3:4b
+      - name: Build the index
+        run: uv run rag-lab ingest --docs docs/ --db rag.db
+      - name: Run the gated eval against the committed baseline
+        run: >
+          uv run rag-lab eval --golden golden.yml --db rag.db --repeat 3
+          --baseline eval-baseline.json

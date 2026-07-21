@@ -30,6 +30,9 @@ studio = [
 deepeval = [
     "deepeval>=2.0",
 ]
+mcp = [
+    "mcp>=1.2",
+]
 
 [project.scripts]
 rag-lab = "rag_lab.cli:app"

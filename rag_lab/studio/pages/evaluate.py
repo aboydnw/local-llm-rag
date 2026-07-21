@@ -26,6 +26,16 @@ def render() -> None:
         return
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
+    repeat = int(
+        st.number_input(
+            "Repeats",
+            min_value=1,
+            max_value=10,
+            value=1,
+            help="Run the golden set N times and report mean ± stdev — local models are "
+            "noisy, so repeats separate real improvements from run-to-run variance.",
+        )
+    )
     cfg.eval.deepeval = st.checkbox(
         "DeepEval scoring",
         value=cfg.eval.deepeval,
@@ -58,6 +68,7 @@ def render() -> None:
                     run_id=uuid.uuid4().hex[:8],
                     created_at=datetime.now(UTC).isoformat(timespec="seconds"),
                     name=name or None,
+                    repeat=repeat,
                 )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Eval failed: {exc}")
@@ -75,7 +86,16 @@ def render() -> None:
             st.warning("The last run is no longer available.")
             return
         st.subheader("Aggregates")
-        st.table({k: [round(v, 3)] for k, v in record.scores.items()})
+        st.table(
+            {
+                k: [
+                    f"{round(v, 3)} ±{round(record.scores_std[k], 3)}"
+                    if k in record.scores_std
+                    else round(v, 3)
+                ]
+                for k, v in record.scores.items()
+            }
+        )
         st.subheader("Report")
         report = ws.run_dir(run_id) / "report.md"
         if report.exists():

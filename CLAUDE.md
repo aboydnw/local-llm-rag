@@ -13,3 +13,9 @@ See [PRD.md](PRD.md) for the product. Three loops: **ingest**, **ask** (query), 
   Streamlit `app.py`/`sidebar.py`/`pages/` are a thin render layer and are not unit-tested.
   Streamlit is an optional extra (`uv sync --extra studio`); never import it from modules the
   core CLI loads at startup. Studio state lives in a gitignored `.rag-lab/` dir.
+- **Run store** (`rag_lab/eval/run_store.py`): the CLI, Studio, and MCP server share one run
+  history at `.rag-lab/runs/` (plus a pinned baseline). Dependency direction is core ← studio:
+  studio modules may import `rag_lab.eval.*`, never the reverse.
+- **MCP server** (`rag-lab mcp`): eval harness as MCP tools. The `mcp` package is an optional
+  extra (`uv sync --extra mcp`) — same import rule as Streamlit; tool logic lives in
+  `rag_lab/eval/mcp_tools.py` so it stays testable without the extra.

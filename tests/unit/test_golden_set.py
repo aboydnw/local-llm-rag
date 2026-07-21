@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from rag_lab.eval.golden_set import GoldenItem, load_golden_set
+from rag_lab.eval.golden_set import GoldenItem, append_golden_case, load_golden_set
 
 
 def test_load_golden_set_parses_yaml(tmp_path: Path) -> None:
@@ -67,3 +67,25 @@ def test_golden_item_reads_expect_abstention(tmp_path) -> None:
     path.write_text("- id: q1\n  question: hi\n  expect_abstention: true\n", encoding="utf-8")
     items = load_golden_set(path)
     assert items[0].expect_abstention is True
+
+
+def test_append_golden_case_preserves_existing_and_adds_new(tmp_path) -> None:
+    path = tmp_path / "golden.yml"
+    path.write_text("- id: q1\n  question: first\n", encoding="utf-8")
+    append_golden_case(path, GoldenItem(id="q2", question="second"))
+    ids = [item.id for item in load_golden_set(path)]
+    assert ids == ["q1", "q2"]
+
+
+def test_append_golden_case_rejects_duplicate_id(tmp_path) -> None:
+    path = tmp_path / "golden.yml"
+    path.write_text("- id: q1\n  question: first\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        append_golden_case(path, GoldenItem(id="q1", question="dup"))
+
+
+def test_append_golden_case_leaves_no_temp_files(tmp_path) -> None:
+    path = tmp_path / "golden.yml"
+    path.write_text("- id: q1\n  question: first\n", encoding="utf-8")
+    append_golden_case(path, GoldenItem(id="q2", question="second"))
+    assert [p.name for p in tmp_path.iterdir()] == ["golden.yml"]

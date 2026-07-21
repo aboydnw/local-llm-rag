@@ -86,55 +86,31 @@ def test_run_eval_uses_agent_when_enabled(tmp_path, monkeypatch):
     assert "recall@k_seen" in record.scores
 
 
-def test_aggregate_scores_includes_agent_metrics():
-    from rag_lab.eval.runner import EvalResult
-
-    results = [
-        EvalResult(
-            item_id="a", question="q", actual_answer="x",
-            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
-            agent_metrics={"tool_calls": 2.0},
-        ),
-        EvalResult(
-            item_id="b", question="q", actual_answer="x",
-            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
-            agent_metrics={"tool_calls": 4.0},
-        ),
-    ]
-    scores = experiments._aggregate_scores(results)
-    assert scores["tool_calls"] == 3.0
-
-
-def test_aggregate_scores_includes_perf_when_stats_captured():
-    from rag_lab.eval.runner import EvalResult
-
-    results = [
-        EvalResult(
-            item_id="a", question="q", actual_answer="x",
-            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
-            generation_stats={
-                "prompt_tokens": 1000.0, "prompt_eval_ms": 2000.0,
-                "output_tokens": 100.0, "generation_ms": 10000.0,
-            },
-        )
-    ]
-    scores = experiments._aggregate_scores(results)
-    assert scores["prompt_eval_tps_mean"] == 500.0
-    assert scores["generation_tps_mean"] == 10.0
-    assert "total_ms_p50" in scores
+def test_run_eval_repeat_records_std(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    corpus = _corpus(tmp_path)
+    record = experiments.run_eval(
+        ws,
+        local_corpus(str(corpus)),
+        Config(),
+        _golden(tmp_path),
+        run_id="r-rep",
+        created_at="2026-06-17T00:00:00+00:00",
+        repeat=2,
+        loader=MarkdownLoader(corpus),
+        embedder=FakeEmbedder(16),
+        llm=FakeLLM(),
+    )
+    assert record.repeat == 2
+    assert "recall@k" in record.scores_std
 
 
-def test_aggregate_scores_omits_perf_without_stats():
-    from rag_lab.eval.runner import EvalResult
-
-    results = [
-        EvalResult(
-            item_id="a", question="q", actual_answer="x",
-            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
-        )
-    ]
-    scores = experiments._aggregate_scores(results)
-    assert not any(k.startswith("prompt_eval_tps") for k in scores)
+def test_baseline_pin_via_workspace(tmp_path):
+    ws, _ = _run(tmp_path, "r1")
+    assert experiments.get_baseline(ws) is None
+    experiments.set_baseline(ws, "r1")
+    assert experiments.get_baseline(ws) == "r1"
 
 
 def test_run_eval_persists_run(tmp_path):
