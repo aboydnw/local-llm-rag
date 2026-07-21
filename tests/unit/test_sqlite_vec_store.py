@@ -17,6 +17,35 @@ def _make_chunks(n: int) -> list[Chunk]:
     ]
 
 
+def test_list_documents_returns_distinct_sorted_paths(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    chunks = _make_chunks(3)
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    assert store.list_documents() == ["docs/0.md", "docs/1.md", "docs/2.md"]
+
+
+def test_chunks_for_doc_returns_chunks_in_position_order(tmp_path: Path) -> None:
+    embedder = FakeEmbedder(dimension=16)
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    doc = Path("docs/guide.md")
+    chunks = [
+        Chunk(text="second", doc_path=doc, heading_path=("H",), position=1),
+        Chunk(text="first", doc_path=doc, heading_path=("H",), position=0),
+    ]
+    store.upsert(chunks, embedder.embed([c.text for c in chunks]))
+    got = store.chunks_for_doc("docs/guide.md")
+    assert [c.text for c in got] == ["first", "second"]
+
+
+def test_chunks_for_doc_unknown_path_returns_empty(tmp_path: Path) -> None:
+    store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
+    store.initialize()
+    assert store.chunks_for_doc("nope.md") == []
+
+
 def test_initialize_creates_schema(tmp_path: Path) -> None:
     store = SqliteVecStore(tmp_path / "rag.db", dimension=16)
     store.initialize()

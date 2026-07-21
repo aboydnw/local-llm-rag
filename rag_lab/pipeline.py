@@ -1,5 +1,18 @@
 from pathlib import Path
 
+from rag_lab.agent.agent import Agent
+from rag_lab.agent.tools import (
+    KEYWORD_SEARCH_DESCRIPTION,
+    VECTOR_SEARCH_DESCRIPTION,
+    FetchDocumentTool,
+    ListDocumentsTool,
+    SearchTool,
+)
+from rag_lab.chunkers.base import Chunker
+from rag_lab.chunkers.fixed import FixedSizeChunker
+from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
+from rag_lab.chunkers.recursive import RecursiveChunker
+from rag_lab.chunkers.semantic import SemanticChunker
 from rag_lab.config import Config, embedding_dimension
 from rag_lab.embedders.ollama import OllamaEmbedder, prefixes_for_model
 from rag_lab.llms.ollama import OllamaLLM
@@ -27,8 +40,39 @@ def build_embedder(config: Config) -> OllamaEmbedder:
     )
 
 
+def build_chunker(config: Config, embedder=None) -> Chunker:
+    chunker = config.chunker
+    if chunker.type == "markdown_aware":
+        return MarkdownAwareChunker(
+            max_tokens=chunker.max_tokens,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    if chunker.type == "fixed":
+        return FixedSizeChunker(
+            max_tokens=chunker.max_tokens,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    if chunker.type == "recursive":
+        return RecursiveChunker(
+            max_tokens=chunker.max_tokens,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    if chunker.type == "semantic":
+        return SemanticChunker(
+            embedder=embedder or build_embedder(config),
+            max_tokens=chunker.max_tokens,
+            similarity_threshold=chunker.similarity_threshold,
+            overlap=chunker.overlap,
+            context_header=chunker.context_header,
+        )
+    raise ValueError(f"Unknown chunker type: {chunker.type}")
+
+
 def build_llm(config: Config) -> OllamaLLM:
-    return OllamaLLM(model=config.llm.model)
+    return OllamaLLM(model=config.llm.model, think=config.llm.think)
 
 
 def build_store(config: Config, db: Path) -> SqliteVecStore:
@@ -63,6 +107,35 @@ def build_retriever(store: SqliteVecStore, embedder, config: Config) -> Retrieve
             candidates=config.retriever.rerank_candidates,
         )
     return base
+
+
+def build_agent(store: SqliteVecStore, embedder, config: Config) -> Agent:
+    vector = VectorRetriever(store=store, embedder=embedder)
+    bm25 = BM25Retriever(store=store)
+    factories = {
+        "vector_search": lambda: SearchTool(
+            "vector_search", VECTOR_SEARCH_DESCRIPTION, vector, k=config.retriever.k
+        ),
+        "keyword_search": lambda: SearchTool(
+            "keyword_search", KEYWORD_SEARCH_DESCRIPTION, bm25, k=config.retriever.k
+        ),
+        "list_documents": lambda: ListDocumentsTool(store),
+        "fetch_document": lambda: FetchDocumentTool(store),
+    }
+    tools = []
+    for name in config.agent.tools:
+        if name not in factories:
+            raise ValueError(f"Unknown agent tool: {name}")
+        tools.append(factories[name]())
+    return Agent(
+        llm=build_llm(config),
+        tools=tools,
+        prompt_builder=build_prompt_builder(config),
+        max_steps=config.agent.max_steps,
+        final_k=config.agent.final_k,
+        instructions=config.agent.instructions,
+        structured_output=config.agent.structured_output,
+    )
 
 
 def index_manifest(config: Config) -> dict:

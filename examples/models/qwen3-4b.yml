@@ -1,0 +1,40 @@
+# Bake-off candidate: qwen3:4b (Q4_K_M default from `ollama pull qwen3:4b`).
+#
+# Qwen3 ships with thinking mode on by default, which emits <think>...</think>
+# reasoning that pollutes RAG answers and inflates generation time. We disable it
+# with `think: false` so the model answers directly. Revisit if the bake-off shows
+# thinking materially helps agent tool selection.
+#
+# Everything except the llm block matches the current default so the only variable
+# under test is the generator model.
+chunker:
+  type: markdown_aware
+  max_tokens: 512
+  overlap: 50
+  context_header: true
+embedder:
+  type: ollama
+  model: nomic-embed-text
+llm:
+  type: ollama
+  model: qwen3:4b
+  think: false
+retriever:
+  type: hybrid
+  bm25_weight: 0.5
+  vector_weight: 0.5
+  k: 5
+  reranker: none
+  rerank_candidates: 30
+eval:
+  deepeval: false
+agent:
+  enabled: false
+  max_steps: 6
+  final_k: 5
+  structured_output: false
+  tools:
+    - vector_search
+    - keyword_search
+    - list_documents
+    - fetch_document

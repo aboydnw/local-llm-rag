@@ -5,14 +5,16 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from rag_lab.agent.agent import DEFAULT_AGENT_INSTRUCTIONS
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
 
 class ChunkerConfig(BaseModel):
-    type: Literal["markdown_aware", "fixed"] = "markdown_aware"
+    type: Literal["markdown_aware", "fixed", "recursive", "semantic"] = "markdown_aware"
     max_tokens: int = Field(default=512, gt=0)
     overlap: int = Field(default=50, ge=0)
     context_header: bool = True
+    similarity_threshold: float = Field(default=0.75, ge=0, le=1)
 
 
 class EmbedderConfig(BaseModel):
@@ -23,6 +25,9 @@ class EmbedderConfig(BaseModel):
 class LLMConfig(BaseModel):
     type: Literal["ollama"] = "ollama"
     model: str = "llama3.2:3b"
+    think: bool | None = None
+    """Thinking-mode toggle for reasoning models (e.g. Qwen3). None leaves the
+    model default; False disables thinking to cut latency and answer pollution."""
 
 
 class RetrieverConfig(BaseModel):
@@ -65,6 +70,30 @@ class PromptConfig(BaseModel):
     system_instructions: str = DEFAULT_SYSTEM_INSTRUCTIONS
 
 
+class AgentConfig(BaseModel):
+    enabled: bool = False
+    max_steps: int = Field(default=6, gt=0)
+    final_k: int = Field(default=5, gt=0)
+    structured_output: bool = False
+    instructions: str = DEFAULT_AGENT_INSTRUCTIONS
+    tools: list[
+        Literal[
+            "vector_search",
+            "keyword_search",
+            "list_documents",
+            "fetch_document",
+        ]
+    ] = Field(
+        min_length=1,
+        default_factory=lambda: [
+            "vector_search",
+            "keyword_search",
+            "list_documents",
+            "fetch_document",
+        ]
+    )
+
+
 class Config(BaseModel):
     chunker: ChunkerConfig = ChunkerConfig()
     embedder: EmbedderConfig = EmbedderConfig()
@@ -72,6 +101,7 @@ class Config(BaseModel):
     retriever: RetrieverConfig = RetrieverConfig()
     eval: EvalConfig = EvalConfig()
     prompt: PromptConfig = PromptConfig()
+    agent: AgentConfig = AgentConfig()
 
 
 EMBEDDING_DIMENSIONS: dict[str, int] = {
@@ -92,11 +122,15 @@ def embedding_dimension(model: str) -> int:
 def config_summary(config: Config) -> str:
     """One-line human summary of the swappable knobs in a config."""
     r = config.retriever
-    return (
+    summary = (
         f"chunker={config.chunker.type}@{config.chunker.max_tokens} "
         f"retriever={r.type}(v={r.vector_weight},b={r.bm25_weight}) "
         f"llm={config.llm.model} embedder={config.embedder.model}"
     )
+    if config.agent.enabled:
+        a = config.agent
+        summary += f" agent=on(steps={a.max_steps},tools={len(a.tools)})"
+    return summary
 
 
 DEFAULT_CONFIG_YAML = """\
@@ -120,6 +154,16 @@ retriever:
   rerank_candidates: 30
 eval:
   deepeval: false
+agent:
+  enabled: false
+  max_steps: 6
+  final_k: 5
+  structured_output: false
+  tools:
+    - vector_search
+    - keyword_search
+    - list_documents
+    - fetch_document
 """
 
 

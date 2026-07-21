@@ -1,7 +1,7 @@
 import streamlit as st
 
 from rag_lab.config import config_summary
-from rag_lab.studio import experiments
+from rag_lab.studio import experiments, trace_view
 from rag_lab.studio.workspace import Workspace
 
 
@@ -50,3 +50,20 @@ def render() -> None:
         report = ws.run_dir(sel) / "report.md"
         if report.exists():
             st.markdown(report.read_text())
+
+    st.subheader("Inspect agent trace")
+    trace_run = st.selectbox(
+        "Run", ids, format_func=lambda i: labels[i], key="trace_run"
+    )
+    items = experiments.load_run_items(ws, trace_run)
+    agent_items = [it for it in items if it.get("agent_trace")]
+    if not agent_items:
+        st.caption("This run has no agent traces (retriever-mode run).")
+    else:
+        pick = st.selectbox(
+            "Question",
+            agent_items,
+            format_func=lambda it: f"{it['item_id']}: {it['question']}",
+            key="trace_item",
+        )
+        trace_view.render_steps(pick["agent_trace"], key_prefix=f"runs_{trace_run}")

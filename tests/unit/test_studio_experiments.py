@@ -12,6 +12,9 @@ class FakeLLM:
     def generate(self, prompt: str) -> str:
         return "The alpha document is about tiles."
 
+    def last_stats(self):
+        return None
+
 
 def _corpus(tmp_path):
     d = tmp_path / "corpus"
@@ -49,6 +52,91 @@ def _run(tmp_path, run_id, config=None):
     )
 
 
+def test_run_eval_uses_agent_when_enabled(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from rag_lab.agent.agent import AgentResult, AgentStep
+    from rag_lab.types import Chunk
+
+    class _FakeAgent:
+        def run(self, question: str) -> AgentResult:
+            chunk = Chunk(
+                text="tiles", doc_path=Path("a.md"), heading_path=("H",), position=0
+            )
+            return AgentResult(
+                answer="about tiles [1]",
+                steps=[
+                    AgentStep(
+                        thought="t", action="keyword_search",
+                        action_input="q", observation="o", chunks=[chunk],
+                    )
+                ],
+                chunks_seen=[chunk],
+                final_context=[chunk],
+                llm_calls=2,
+            )
+
+    monkeypatch.setattr(
+        "rag_lab.studio.components.build_agent", lambda *a, **k: _FakeAgent()
+    )
+    config = Config()
+    config.agent.enabled = True
+    _, record = _run(tmp_path, "r-agent", config=config)
+    assert record.scores["tool_calls"] == 1.0
+    assert "recall@k_seen" in record.scores
+
+
+def test_aggregate_scores_includes_agent_metrics():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            agent_metrics={"tool_calls": 2.0},
+        ),
+        EvalResult(
+            item_id="b", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            agent_metrics={"tool_calls": 4.0},
+        ),
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert scores["tool_calls"] == 3.0
+
+
+def test_aggregate_scores_includes_perf_when_stats_captured():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+            generation_stats={
+                "prompt_tokens": 1000.0, "prompt_eval_ms": 2000.0,
+                "output_tokens": 100.0, "generation_ms": 10000.0,
+            },
+        )
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert scores["prompt_eval_tps_mean"] == 500.0
+    assert scores["generation_tps_mean"] == 10.0
+    assert "total_ms_p50" in scores
+
+
+def test_aggregate_scores_omits_perf_without_stats():
+    from rag_lab.eval.runner import EvalResult
+
+    results = [
+        EvalResult(
+            item_id="a", question="q", actual_answer="x",
+            recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0,
+        )
+    ]
+    scores = experiments._aggregate_scores(results)
+    assert not any(k.startswith("prompt_eval_tps") for k in scores)
+
+
 def test_run_eval_persists_run(tmp_path):
     ws, record = _run(tmp_path, "r1")
     assert record.run_id == "r1"
@@ -56,6 +144,20 @@ def test_run_eval_persists_run(tmp_path):
     assert (ws.run_dir("r1") / "run.json").exists()
     assert (ws.run_dir("r1") / "report.md").exists()
     assert (ws.run_dir("r1") / "config.yml").exists()
+
+
+def test_run_eval_persists_items_json(tmp_path):
+    ws, _ = _run(tmp_path, "r1")
+    assert (ws.run_dir("r1") / "items.json").exists()
+    items = experiments.load_run_items(ws, "r1")
+    assert items and items[0]["question"] == "What is alpha about?"
+    assert "agent_trace" in items[0]
+
+
+def test_load_run_items_returns_empty_when_absent(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    assert experiments.load_run_items(ws, "missing") == []
 
 
 def test_run_eval_snapshots_corpus_sources(tmp_path):

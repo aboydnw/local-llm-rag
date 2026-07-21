@@ -4,21 +4,26 @@ from pathlib import Path
 
 import streamlit as st
 
+from rag_lab.studio import config_panel, experiments
 from rag_lab.studio import corpora as corpora_mod
-from rag_lab.studio import experiments
+from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.workspace import Workspace
 
 
 def render() -> None:
     """Render the Evaluate page: run the golden set and show aggregates + report."""
     st.title("Evaluate")
-    cfg = st.session_state["config"]
+    cfg = config_panel.render(st.session_state, "evaluate")
     ws = Workspace.default()
     ws.initialize()
     corpus = corpora_mod.resolve_active_corpus(
         ws, st.session_state.get("corpus_name"), st.session_state["corpus"]
     )
     golden = Path(st.session_state["golden"])
+
+    if indexer_mod.status(ws, corpus, cfg).needs_build:
+        st.warning("This corpus isn't built yet — build it on the **Corpus** page.")
+        return
 
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
     cfg.eval.deepeval = st.checkbox(
@@ -42,10 +47,11 @@ def render() -> None:
         st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
     if st.button("Run eval", type="primary"):
+        st.session_state["evaluate_config_acted"] = True
         if not golden.exists():
             st.error(f"Golden set not found: {golden}")
             return
-        with st.spinner("Running eval (this builds the index if needed)..."):
+        with st.spinner("Running eval..."):
             try:
                 record = experiments.run_eval(
                     ws, corpus, cfg, golden,

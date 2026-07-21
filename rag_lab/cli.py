@@ -6,7 +6,6 @@ import typer
 from rag_lab import __version__, pipeline
 from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
-from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.aggregate import aggregate_metrics
 from rag_lab.eval.gates import gate_failures
@@ -98,12 +97,8 @@ def ingest(
                 raise typer.Exit(code=1)
             loader = MarkdownLoader(source)
 
-        chunker = MarkdownAwareChunker(
-            max_tokens=cfg.chunker.max_tokens,
-            overlap=cfg.chunker.overlap,
-            context_header=cfg.chunker.context_header,
-        )
         embedder = pipeline.build_embedder(cfg)
+        chunker = pipeline.build_chunker(cfg, embedder=embedder)
         store = pipeline.build_store(cfg, db)
 
         typer.echo(f"Ingesting into {db}...")
@@ -120,6 +115,61 @@ def ingest(
             workdir.cleanup()
 
 
+def _format_stats_line(stats) -> str:
+    return (
+        f"prompt {stats.prompt_tokens:,} tok @ {stats.prompt_eval_tps:.1f} tok/s "
+        f"({stats.prompt_eval_ms / 1000:.1f}s) · "
+        f"gen {stats.output_tokens:,} tok @ {stats.generation_tps:.1f} tok/s "
+        f"({stats.generation_ms / 1000:.1f}s)"
+    )
+
+
+def _echo_stats(stats, llm_calls: int | None = None) -> None:
+    typer.echo("")
+    typer.echo("--- Stats ---")
+    if stats is None:
+        typer.echo("No generation stats captured (LLM did not report timing metadata).")
+        return
+    line = _format_stats_line(stats)
+    if llm_calls is not None:
+        line += f" · {llm_calls} llm calls"
+    typer.echo(line)
+
+
+def _run_agent(
+    question: str,
+    store,
+    embedder,
+    cfg: config_mod.Config,
+    show_trace: bool,
+    show_stats: bool = False,
+) -> None:
+    try:
+        agent = pipeline.build_agent(store, embedder, cfg)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    result = agent.run(question)
+    if show_trace:
+        typer.echo("--- Agent trace ---")
+        for step in result.steps:
+            if step.action is None:
+                continue
+            typer.echo(f"Thought: {step.thought}")
+            typer.echo(f"Action: {step.action} — {step.action_input}")
+            typer.echo(f"Observation: {step.observation}")
+            typer.echo("")
+    typer.echo(result.answer)
+    typer.echo("")
+    typer.echo("--- Sources ---")
+    for i, chunk in enumerate(result.final_context, start=1):
+        typer.echo(f"[{i}] {chunk.doc_path} — {' > '.join(chunk.heading_path)}")
+    if show_stats:
+        from rag_lab.types import combine_stats
+
+        _echo_stats(combine_stats(result.stats), llm_calls=result.llm_calls)
+
+
 @app.command()
 def ask(
     question: str = typer.Argument(..., help="Your question."),
@@ -131,6 +181,15 @@ def ask(
     ),
     force: bool = typer.Option(
         False, "--force", help="Query even if the index was built with a different config."
+    ),
+    use_agent: bool = typer.Option(
+        False, "--agent", help="Let the LLM orchestrate retrieval tools (agentic mode)."
+    ),
+    show_trace: bool = typer.Option(
+        False, "--show-trace", help="Print the agent's reasoning trace (agent mode only)."
+    ),
+    stats: bool = typer.Option(
+        False, "--stats", help="Print prompt-eval and generation throughput after the answer."
     ),
 ) -> None:
     """Ask a question against an ingested corpus."""
@@ -148,6 +207,11 @@ def ask(
     store = pipeline.build_store(cfg, db)
     _require_compatible_index(store, cfg, force)
     embedder = pipeline.build_embedder(cfg)
+    if use_agent or cfg.agent.enabled:
+        if k:
+            cfg.retriever.k = k
+        _run_agent(question, store, embedder, cfg, show_trace, show_stats=stats)
+        return
     retriever = pipeline.build_retriever(store, embedder, cfg)
     llm = pipeline.build_llm(cfg)
     builder = pipeline.build_prompt_builder(cfg)
@@ -172,6 +236,8 @@ def ask(
     typer.echo("--- Sources ---")
     for i, r in enumerate(results, start=1):
         typer.echo(f"[{i}] {r.chunk.doc_path} — {' > '.join(r.chunk.heading_path)}")
+    if stats:
+        _echo_stats(llm.last_stats())
 
 
 @inspect_app.command("chunks")
@@ -223,6 +289,11 @@ def eval(  # noqa: A001
     baseline: Path | None = typer.Option(
         None, "--baseline", help="Baseline run.json to gate against (see eval.gates in rag.yml)."
     ),
+    use_agent: bool = typer.Option(
+        False,
+        "--agent",
+        help="Evaluate the LLM tool-orchestration agent instead of the fixed retriever.",
+    ),
 ) -> None:
     """Run the eval harness against a golden set and write a markdown report."""
     if not golden.exists():
@@ -255,6 +326,11 @@ def eval(  # noqa: A001
                 err=True,
             )
             raise typer.Exit(code=1) from exc
+    agent = (
+        pipeline.build_agent(store, embedder, cfg)
+        if (use_agent or cfg.agent.enabled)
+        else None
+    )
     runner = EvalRunner(
         retriever=retriever,
         llm=llm,
@@ -262,6 +338,7 @@ def eval(  # noqa: A001
         deepeval_scorer=scorer,
         prompt_builder=pipeline.build_prompt_builder(cfg),
         abstention_markers=cfg.eval.abstention_markers,
+        agent=agent,
     )
 
     items = golden_set_mod.load_golden_set(golden)

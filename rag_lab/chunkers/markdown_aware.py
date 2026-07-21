@@ -1,8 +1,7 @@
 import re
 from collections.abc import Iterator
 
-import tiktoken
-
+from rag_lab.chunkers import splitting
 from rag_lab.types import Chunk, Document
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
@@ -19,7 +18,7 @@ class MarkdownAwareChunker:
         self.max_tokens = max_tokens
         self.overlap = overlap
         self.context_header = context_header
-        self._encoder = tiktoken.get_encoding("cl100k_base")
+        self._encoder = splitting.get_encoder()
 
     def chunk(self, document: Document) -> Iterator[Chunk]:
         position = 0
@@ -41,8 +40,7 @@ class MarkdownAwareChunker:
 
     @staticmethod
     def _header(document: Document, heading_path: tuple[str, ...]) -> str:
-        label = document.metadata.get("source") or document.path.name
-        return " > ".join([label, *heading_path])
+        return " > ".join([splitting.document_label(document), *heading_path])
 
     def _iter_sections(self, text: str) -> Iterator[tuple[tuple[str, ...], str]]:
         stack: list[tuple[int, str]] = []
@@ -78,11 +76,6 @@ class MarkdownAwareChunker:
         if len(tokens) <= self.max_tokens:
             yield body
             return
-        start = 0
-        step = self.max_tokens - self.overlap
-        while start < len(tokens):
-            window = tokens[start : start + self.max_tokens]
-            yield self._encoder.decode(window)
-            if start + self.max_tokens >= len(tokens):
-                return
-            start += step
+        yield from splitting.cascade_split(
+            body, self._encoder, self.max_tokens, self.overlap
+        )

@@ -4,9 +4,11 @@ import streamlit as st
 
 from rag_lab import config as config_mod
 from rag_lab.config import Config
+from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import sidebar, ui_state
 from rag_lab.studio.pages import corpora as corpora_page
 from rag_lab.studio.pages import evaluate, golden, playground, runs
+from rag_lab.studio.workspace import Workspace
 
 
 def _load_config() -> Config:
@@ -23,6 +25,9 @@ def main() -> None:
     ui_state.init_state(
         st.session_state, _load_config(), ".", "examples/devseed-oss/golden.yml"
     )
+    ws = Workspace.default()
+    ws.initialize()
+    corpora_mod.ensure_default_corpus(ws)
     sidebar.render(st.session_state)
 
     pages = st.navigation([
@@ -30,7 +35,7 @@ def main() -> None:
                 url_path="playground", default=True),
         st.Page(corpora_page.render, title="Corpus", icon="📚", url_path="corpus"),
         st.Page(evaluate.render, title="Evaluate", icon="📊", url_path="evaluate"),
-        st.Page(runs.render, title="Runs", icon="🏆", url_path="runs"),
+        st.Page(runs.render, title="Past Evaluation Runs", icon="🏆", url_path="runs"),
         st.Page(golden.render, title="Golden set", icon="✏️", url_path="golden"),
     ])
     pages.run()

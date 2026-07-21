@@ -1,6 +1,7 @@
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from rag_lab.studio.workspace import Workspace
 
@@ -109,6 +110,26 @@ def validate_issue_ref(ref: str) -> str | None:
     if parse_issue_ref(ref) is None:
         return "Enter an issue as owner/repo#123, e.g. developmentseed/titiler#42."
     return None
+
+
+def validate_folder(path: str) -> str | None:
+    """Return a reason ``path`` is unusable as a local-folder source, or ``None``."""
+    p = path.strip()
+    if not p:
+        return "Enter a folder path."
+    fp = Path(p)
+    if not fp.exists():
+        return f"Folder not found: {p}"
+    if not fp.is_dir():
+        return f"Not a directory: {p}"
+    return None
+
+
+def ensure_default_corpus(ws: Workspace) -> None:
+    """Seed a ``local`` corpus pointing at the current directory when none exist yet."""
+    if list_corpora(ws):
+        return
+    save_corpus(ws, Corpus(name="local", sources=(Source(type="local", path="."),)))
 
 
 def list_corpora(ws: Workspace) -> list[str]:

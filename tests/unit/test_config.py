@@ -8,6 +8,13 @@ from rag_lab.config import Config, load_config, write_default_config
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
 
+def test_agent_config_rejects_empty_tools() -> None:
+    from rag_lab.config import AgentConfig
+
+    with pytest.raises(ValidationError):
+        AgentConfig(tools=[])
+
+
 def test_load_config_parses_yaml(tmp_path: Path) -> None:
     cfg_path = tmp_path / "rag.yml"
     cfg_path.write_text(
@@ -33,6 +40,22 @@ retriever:
     assert isinstance(cfg, Config)
     assert cfg.chunker.max_tokens == 256
     assert cfg.retriever.k == 7
+
+
+def test_example_model_configs_load_with_expected_think_setting() -> None:
+    examples = Path(__file__).resolve().parents[2] / "examples" / "models"
+    qwen = load_config(examples / "qwen3-4b.yml")
+    phi = load_config(examples / "phi4-mini.yml")
+    assert qwen.llm.model == "qwen3:4b"
+    assert qwen.llm.think is False
+    assert phi.llm.model == "phi4-mini"
+    assert phi.llm.think is None
+
+
+def test_llm_config_think_defaults_to_none() -> None:
+    from rag_lab.config import LLMConfig
+
+    assert LLMConfig().think is None
 
 
 def test_load_config_rejects_unknown_chunker_type(tmp_path: Path) -> None:
@@ -64,12 +87,77 @@ def test_load_config_parses_eval_section(tmp_path: Path) -> None:
     assert cfg.eval.deepeval is True
 
 
+def test_agent_config_defaults_to_disabled():
+    from rag_lab.config import AgentConfig
+    assert AgentConfig().enabled is False
+    assert Config().agent.enabled is False
+    assert Config().agent.max_steps == 6
+    assert Config().agent.final_k == 5
+    assert Config().agent.tools == [
+        "vector_search",
+        "keyword_search",
+        "list_documents",
+        "fetch_document",
+    ]
+
+
+def test_load_config_parses_agent_section(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "rag.yml"
+    cfg_path.write_text(
+        "agent:\n"
+        "  enabled: true\n"
+        "  max_steps: 3\n"
+        "  final_k: 2\n"
+        "  tools:\n"
+        "    - vector_search\n"
+        "    - keyword_search\n"
+    )
+    cfg = load_config(cfg_path)
+    assert cfg.agent.enabled is True
+    assert cfg.agent.max_steps == 3
+    assert cfg.agent.final_k == 2
+    assert cfg.agent.tools == ["vector_search", "keyword_search"]
+
+
+def test_load_config_rejects_unknown_agent_tool(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "rag.yml"
+    cfg_path.write_text("agent:\n  tools:\n    - bogus_tool\n")
+    with pytest.raises(ValidationError):
+        load_config(cfg_path)
+
+
+def test_default_config_file_has_agent_section(tmp_path) -> None:
+    path = tmp_path / "rag.yml"
+    write_default_config(path)
+    assert load_config(path).agent.enabled is False
+
+
+def test_agent_config_default_instructions_match_engine():
+    from rag_lab.agent.agent import DEFAULT_AGENT_INSTRUCTIONS
+    assert Config().agent.instructions == DEFAULT_AGENT_INSTRUCTIONS
+
+
 def test_config_summary_mentions_key_knobs():
     summary = config_mod.config_summary(Config())
     assert "markdown_aware" in summary
     assert "hybrid" in summary
     assert "llama3.2:3b" in summary
     assert "nomic-embed-text" in summary
+
+
+def test_config_summary_marks_agent_runs():
+    config = Config()
+    config.agent.enabled = True
+    config.agent.max_steps = 4
+    config.agent.tools = ["vector_search", "keyword_search"]
+    summary = config_mod.config_summary(config)
+    assert "agent=on" in summary
+    assert "steps=4" in summary
+    assert "tools=2" in summary
+
+
+def test_config_summary_omits_agent_when_disabled():
+    assert "agent" not in config_mod.config_summary(Config())
 
 
 def test_config_prompt_defaults_to_canonical_instructions():
@@ -105,3 +193,18 @@ def test_eval_config_rejects_negative_gate_threshold() -> None:
 def test_eval_config_rejects_non_finite_gate_threshold() -> None:
     with pytest.raises(ValidationError):
         Config(eval={"gates": {"recall@k": float("inf")}})
+
+
+def test_chunker_config_accepts_recursive_and_semantic_types():
+    from rag_lab.config import ChunkerConfig
+
+    assert ChunkerConfig(type="recursive").type == "recursive"
+    assert ChunkerConfig(type="semantic").type == "semantic"
+
+
+def test_chunker_config_similarity_threshold_defaults_and_bounds():
+    from rag_lab.config import ChunkerConfig
+
+    assert ChunkerConfig().similarity_threshold == 0.75
+    with pytest.raises(ValidationError):
+        ChunkerConfig(similarity_threshold=1.5)

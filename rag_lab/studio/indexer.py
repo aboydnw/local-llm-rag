@@ -5,7 +5,6 @@ from pathlib import Path
 
 from rag_lab import ingest as ingest_mod
 from rag_lab import pipeline
-from rag_lab.chunkers.markdown_aware import MarkdownAwareChunker
 from rag_lab.config import Config
 from rag_lab.loaders.combined import CombinedLoader
 from rag_lab.loaders.github import GitHubLoader
@@ -95,11 +94,7 @@ def build_index(
         embedder = components.build_embedder(config)
     if loader is None:
         loader = loader_for_corpus(workspace, corpus)
-    chunker = MarkdownAwareChunker(
-        max_tokens=config.chunker.max_tokens,
-        overlap=config.chunker.overlap,
-        context_header=config.chunker.context_header,
-    )
+    chunker = pipeline.build_chunker(config, embedder=embedder)
     key = cache_key(corpus, config)
     db_path = workspace.index_db(key)
     store = SqliteVecStore(db_path, dimension=embedder.dimension)

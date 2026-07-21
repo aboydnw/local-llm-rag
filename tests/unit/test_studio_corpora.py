@@ -152,3 +152,36 @@ def test_resolve_active_corpus_falls_back_to_local(tmp_path):
 def test_resolve_active_corpus_falls_back_when_missing(tmp_path):
     ws = _ws(tmp_path)
     assert corpora.resolve_active_corpus(ws, "gone", "docs") == corpora.local_corpus("docs")
+
+
+def test_validate_folder_accepts_existing_dir(tmp_path):
+    assert corpora.validate_folder(str(tmp_path)) is None
+
+
+def test_validate_folder_rejects_blank():
+    assert corpora.validate_folder("   ") is not None
+
+
+def test_validate_folder_rejects_missing(tmp_path):
+    assert corpora.validate_folder(str(tmp_path / "nope")) is not None
+
+
+def test_validate_folder_rejects_file(tmp_path):
+    f = tmp_path / "a.md"
+    f.write_text("hi")
+    assert corpora.validate_folder(str(f)) is not None
+
+
+def test_ensure_default_corpus_seeds_local_when_empty(tmp_path):
+    ws = _ws(tmp_path)
+    corpora.ensure_default_corpus(ws)
+    assert corpora.list_corpora(ws) == ["local"]
+    seeded = corpora.load_corpus(ws, "local")
+    assert seeded.sources == (Source(type="local", path="."),)
+
+
+def test_ensure_default_corpus_noop_when_corpora_exist(tmp_path):
+    ws = _ws(tmp_path)
+    corpora.save_corpus(ws, Corpus(name="titiler", sources=()))
+    corpora.ensure_default_corpus(ws)
+    assert corpora.list_corpora(ws) == ["titiler"]
