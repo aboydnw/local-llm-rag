@@ -14,3 +14,4 @@ htmlcov/
 .rag-lab/
 .deepeval/
 /rag.yml
+.feedback/

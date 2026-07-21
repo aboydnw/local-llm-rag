@@ -2282,6 +2282,11 @@ studio = [
     { name = "streamlit" },
 ]
 
+[package.dev-dependencies]
+feedback = [
+    { name = "streamlit-testing-feedback" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "deepeval", marker = "extra == 'deepeval'", specifier = ">=2.0" },
@@ -2301,6 +2306,9 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
 ]
 provides-extras = ["dev", "studio", "deepeval", "mcp"]
+
+[package.metadata.requires-dev]
+feedback = [{ name = "streamlit-testing-feedback", editable = "../streamlit-testing-feedback" }]
 
 [[package]]
 name = "rank-bm25"
@@ -2752,6 +2760,20 @@ sdist = { url = "https://files.pythonhosted.org/packages/91/74/20dac6d6200d6ec0e
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/84/14c36a92fb24f8e1cea452f53b0744b5da69d52cdd2fe22e71e6fbf765d5/streamlit-1.58.0-py3-none-any.whl", hash = "sha256:4ca8a7afc5bd16a5f176ccf4be1e34e8121cad0240becd127fb58a103ea3178d", size = 9219185, upload-time = "2026-05-28T18:02:41.993Z" },
 ]
+
+[[package]]
+name = "streamlit-testing-feedback"
+version = "0.1.0"
+source = { editable = "../streamlit-testing-feedback" }
+dependencies = [
+    { name = "streamlit" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "streamlit", specifier = ">=1.36" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "tabulate"

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -29,6 +30,14 @@ def main() -> None:
     ws.initialize()
     corpora_mod.ensure_default_corpus(ws)
     sidebar.render(st.session_state)
+
+    if os.environ.get("STUDIO_FEEDBACK") == "1":
+        import streamlit_testing_feedback as stf
+
+        with st.sidebar:
+            zip_path = stf.feedback_recorder(dir=".feedback")
+        if zip_path:
+            st.sidebar.success(f"feedback saved: {zip_path.name}")
 
     pages = st.navigation([
         st.Page(playground.render, title="Ask playground", icon="💬",
