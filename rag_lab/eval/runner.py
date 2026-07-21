@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from rag_lab.agent.agent import trace_dict
 from rag_lab.eval.golden_set import GoldenItem
+from rag_lab.eval.scorers.abstention import detected_abstention
 from rag_lab.eval.scorers.citation import citation_validity, parse_citations
 from rag_lab.eval.scorers.keyword import keyword_coverage
 from rag_lab.eval.scorers.retrieval import average_precision, mrr, ndcg_at_k, recall_at_k
@@ -36,6 +37,8 @@ class EvalResult:
     retrieved: list[RetrievedRef] = field(default_factory=list)
     citations: list[int] = field(default_factory=list)
     latency_ms: dict[str, float] = field(default_factory=dict)
+    expected_abstention: bool = False
+    abstained: bool = False
     deepeval_scores: dict[str, float] = field(default_factory=dict)
     agent_metrics: dict[str, float] = field(default_factory=dict)
     agent_tools_used: tuple[str, ...] = ()
@@ -63,6 +66,7 @@ class EvalRunner:
         prompt_builder: PromptBuilder | None = None,
         deepeval_scorer=None,
         clock: Callable[[], float] = time.monotonic,
+        abstention_markers: list[str] | None = None,
         agent=None,
     ) -> None:
         if k <= 0:
@@ -73,6 +77,7 @@ class EvalRunner:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.deepeval_scorer = deepeval_scorer
         self.clock = clock
+        self.abstention_markers = abstention_markers or []
         self.agent = agent
 
     def run(self, items: list[GoldenItem]) -> list[EvalResult]:
@@ -157,6 +162,8 @@ class EvalRunner:
                     retrieved=retrieved,
                     citations=parse_citations(answer),
                     latency_ms=latency_ms,
+                    expected_abstention=item.expect_abstention,
+                    abstained=detected_abstention(answer, self.abstention_markers),
                     deepeval_scores=deepeval_scores,
                     agent_metrics=agent_metrics,
                     agent_tools_used=agent_tools_used,

@@ -55,6 +55,27 @@ class _CitingLLM:
         return None
 
 
+class _AbstainingLLM:
+    def generate(self, prompt: str) -> str:
+        return "I don't know based on the context."
+
+    def last_stats(self):
+        return None
+
+
+def test_runner_records_expected_and_actual_abstention() -> None:
+    items = [GoldenItem(id="x", question="q", expect_abstention=True)]
+    runner = EvalRunner(
+        retriever=_StubRetriever(["a.md"]),
+        llm=_AbstainingLLM(),
+        k=1,
+        abstention_markers=["i don't know"],
+    )
+    result = runner.run(items)[0]
+    assert result.expected_abstention is True
+    assert result.abstained is True
+
+
 def test_runner_captures_retrieved_refs_citations_and_latency() -> None:
     ticks = iter([0.0, 0.010, 0.040])
 

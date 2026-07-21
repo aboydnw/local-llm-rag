@@ -17,6 +17,11 @@ def aggregate_metrics(results: list[EvalResult]) -> dict[str, float]:
     cited = [r.citation_validity for r in results if r.citation_validity is not None]
     if cited:
         agg["citation_validity"] = statistics.mean(cited)
+    flagged = [r for r in results if r.expected_abstention]
+    if flagged:
+        agg["abstention_accuracy"] = statistics.mean(
+            1.0 if r.abstained else 0.0 for r in flagged
+        )
     for key in sorted({k for r in results for k in r.deepeval_scores}):
         vals = [
             r.deepeval_scores[key]

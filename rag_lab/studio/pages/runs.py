@@ -1,8 +1,7 @@
 import streamlit as st
 
 from rag_lab.config import config_summary
-from rag_lab.studio import experiments
-from rag_lab.studio import trace_view
+from rag_lab.studio import experiments, trace_view
 from rag_lab.studio.workspace import Workspace
 
 
