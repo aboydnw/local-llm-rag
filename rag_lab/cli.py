@@ -7,10 +7,9 @@ from rag_lab import __version__, pipeline
 from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.eval import golden_set as golden_set_mod
-from rag_lab.eval import run_store
+from rag_lab.eval import run_store, service
 from rag_lab.eval.gates import gate_failures
 from rag_lab.eval.reporter import MarkdownReporter
-from rag_lab.eval import service
 from rag_lab.eval.run_artifact import prompt_version, read_run, write_run
 from rag_lab.loaders.markdown import MarkdownLoader
 

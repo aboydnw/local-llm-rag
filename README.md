@@ -80,17 +80,37 @@ rag-lab ships with an eval harness so you can measure changes rather than guess 
 
 ```bash
 rag-lab eval --golden golden.yml --report report.md
-rag-lab eval --golden golden.yml --report report.md --previous eval-reports/baseline.md  # diff
-rag-lab eval --golden golden.yml --report report.md --judge  # opt-in Anthropic LLM judge
+rag-lab eval --golden golden.yml --repeat 5          # mean ± stdev over 5 passes
+rag-lab eval --set-baseline 20260721-153000          # pin a run as the baseline
+rag-lab eval --golden golden.yml                     # auto-diffs vs the pinned baseline
 ```
 
 The harness scores retrieval (recall@k, MRR) and answer quality (keyword coverage, plus an
-optional model-graded judge). The `--judge` flag needs the optional `judge` extra
-(`uv pip install 'rag-lab[judge]'`) and an `ANTHROPIC_API_KEY`; everything else runs fully local.
+optional LLM-graded judge via DeepEval — `eval.deepeval: true` in `rag.yml`, judged through
+Ollama like everything else). No API keys required.
+
+Every eval writes into a persistent **run store** (`.rag-lab/runs/`), shared by the CLI,
+Studio, and the MCP server. Each run records its scores plus provenance: config hash,
+rag-lab git sha, and golden-set hash. Pin one run as the **baseline** and every later run
+prints a delta table against it; configure `eval.gates` in `rag.yml` (max allowed drop per
+metric) and the eval exits non-zero on regression — that exit code *is* the CI gate (see
+`examples/github-actions-eval-gate.yml`). Local models are noisy, so `--repeat N` reruns
+the set and reports mean ± stdev; gates compare means, which keeps you from chasing
+run-to-run phantoms.
 
 `examples/devseed-oss/` holds a golden set covering titiler, eoAPI, and stac-fastapi.
 `eval-reports/` is the project's eval trail — every report is committed so you can see how a
 change moved the metrics.
+
+### Eval tools over MCP
+
+`rag-lab mcp` (optional extra: `uv sync --extra mcp`) serves the harness as MCP tools —
+`run_eval`, `list_runs`, `compare_runs`, `get_failures`, `add_golden_case` — over stdio.
+Point any MCP client (Claude Code, Cline, …) at it and the agent gets a self-verifying
+loop: change a knob in `rag.yml` (or pass `config_overrides`), call `run_eval`, read the
+delta vs the pinned baseline, and keep or revert the change based on measured evidence.
+`add_golden_case` lets the agent grow the golden set from questions the corpus answered
+badly in real use.
 
 ## Studio — the visual cockpit
 
