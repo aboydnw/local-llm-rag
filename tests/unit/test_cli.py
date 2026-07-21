@@ -292,6 +292,7 @@ def test_eval_agent_flag_scores_agent_runs(tmp_path: Path, monkeypatch) -> None:
         [
             "eval", "--golden", str(golden), "--config", str(config),
             "--db", str(db), "--report", str(report), "--agent",
+            "--runs-dir", str(tmp_path / "runs"),
         ],
     )
     assert result.exit_code == 0
@@ -328,7 +329,7 @@ def test_eval_exits_2_when_gate_regresses(tmp_path: Path, monkeypatch) -> None:
     _build_matching_index(db, config)
 
     monkeypatch.setattr(
-        "rag_lab.cli.EvalRunner.run",
+        "rag_lab.eval.runner.EvalRunner.run",
         lambda self, items: [EvalResult(item_id="q1", question="hi", actual_answer="a",
                                         recall_at_k=0.0, mrr=0.0, keyword_coverage=0.0)],
     )
@@ -336,7 +337,8 @@ def test_eval_exits_2_when_gate_regresses(tmp_path: Path, monkeypatch) -> None:
         app,
         ["eval", "--config", str(config), "--db", str(db),
          "--golden", str(golden), "--baseline", str(baseline),
-         "--report", str(tmp_path / "report.md")],
+         "--report", str(tmp_path / "report.md"),
+         "--runs-dir", str(tmp_path / "runs")],
     )
     assert result.exit_code == 2
     assert (tmp_path / "report.md").exists()  # the gate runs after the report is written
@@ -354,7 +356,7 @@ def _gated_config(tmp_path: Path) -> Path:
 
 def _monkeypatch_runner(monkeypatch) -> None:
     monkeypatch.setattr(
-        "rag_lab.cli.EvalRunner.run",
+        "rag_lab.eval.runner.EvalRunner.run",
         lambda self, items: [EvalResult(item_id="q1", question="hi", actual_answer="a",
                                         recall_at_k=1.0, mrr=1.0, keyword_coverage=1.0)],
     )
@@ -373,7 +375,8 @@ def test_eval_exits_1_when_baseline_is_unreadable(tmp_path: Path, monkeypatch) -
     result = runner.invoke(
         app,
         ["eval", "--config", str(config), "--db", str(db), "--golden", str(golden),
-         "--baseline", str(bad), "--report", str(tmp_path / "report.md")],
+         "--baseline", str(bad), "--report", str(tmp_path / "report.md"),
+         "--runs-dir", str(tmp_path / "runs")],
     )
     assert result.exit_code == 1
     assert result.exception is None or isinstance(result.exception, SystemExit)
@@ -398,7 +401,143 @@ def test_eval_exits_1_when_baseline_k_differs(tmp_path: Path, monkeypatch) -> No
     result = runner.invoke(
         app,
         ["eval", "--config", str(config), "--db", str(db), "--golden", str(golden),
-         "--baseline", str(baseline), "--report", str(tmp_path / "report.md")],
+         "--baseline", str(baseline), "--report", str(tmp_path / "report.md"),
+         "--runs-dir", str(tmp_path / "runs")],
     )
     assert result.exit_code == 1
     assert (tmp_path / "report.md").exists()
+
+
+def _eval_args(tmp_path: Path, config: Path, golden: Path, db: Path) -> list[str]:
+    return [
+        "eval", "--config", str(config), "--db", str(db), "--golden", str(golden),
+        "--report", str(tmp_path / "report.md"),
+        "--runs-dir", str(tmp_path / "runs"),
+    ]
+
+
+def test_eval_saves_run_to_store(tmp_path: Path, monkeypatch) -> None:
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    _monkeypatch_runner(monkeypatch)
+
+    result = runner.invoke(app, _eval_args(tmp_path, config, golden, db))
+    assert result.exit_code == 0
+    from rag_lab.eval import run_store
+
+    runs = run_store.list_runs(tmp_path / "runs")
+    assert len(runs) == 1
+    assert runs[0].scores["recall@k"] == 1.0
+    assert "config_hash" in runs[0].provenance
+
+
+def test_eval_repeat_records_mean_and_std(tmp_path: Path, monkeypatch) -> None:
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    recalls = iter([1.0, 0.0])
+    monkeypatch.setattr(
+        "rag_lab.eval.runner.EvalRunner.run",
+        lambda self, items: [
+            EvalResult(item_id="q1", question="hi", actual_answer="a",
+                       recall_at_k=next(recalls), mrr=0.5, keyword_coverage=0.5)
+        ],
+    )
+
+    result = runner.invoke(
+        app, [*_eval_args(tmp_path, config, golden, db), "--repeat", "2"]
+    )
+    assert result.exit_code == 0
+    from rag_lab.eval import run_store
+
+    record = run_store.list_runs(tmp_path / "runs")[0]
+    assert record.repeat == 2
+    assert record.scores["recall@k"] == 0.5
+    assert record.scores_std["recall@k"] > 0.0
+
+
+def test_eval_set_baseline_pins_and_exits(tmp_path: Path, monkeypatch) -> None:
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    _monkeypatch_runner(monkeypatch)
+
+    result = runner.invoke(app, _eval_args(tmp_path, config, golden, db))
+    assert result.exit_code == 0
+    from rag_lab.eval import run_store
+
+    run_id = run_store.list_runs(tmp_path / "runs")[0].run_id
+    result = runner.invoke(
+        app,
+        ["eval", "--runs-dir", str(tmp_path / "runs"), "--set-baseline", run_id],
+    )
+    assert result.exit_code == 0
+    assert run_store.get_baseline(tmp_path / "runs") == run_id
+
+
+def test_eval_set_baseline_unknown_run_exits_1(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["eval", "--runs-dir", str(tmp_path / "runs"), "--set-baseline", "nope"],
+    )
+    assert result.exit_code == 1
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+
+
+def test_eval_gates_against_pinned_baseline(tmp_path: Path, monkeypatch) -> None:
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    recalls = iter([1.0, 0.0])
+    monkeypatch.setattr(
+        "rag_lab.eval.runner.EvalRunner.run",
+        lambda self, items: [
+            EvalResult(item_id="q1", question="hi", actual_answer="a",
+                       recall_at_k=next(recalls), mrr=0.5, keyword_coverage=0.5)
+        ],
+    )
+    from rag_lab.eval import run_store
+
+    result = runner.invoke(app, _eval_args(tmp_path, config, golden, db))
+    assert result.exit_code == 0
+    run_id = run_store.list_runs(tmp_path / "runs")[0].run_id
+    runner.invoke(
+        app, ["eval", "--runs-dir", str(tmp_path / "runs"), "--set-baseline", run_id]
+    )
+
+    result = runner.invoke(app, _eval_args(tmp_path, config, golden, db))
+    assert result.exit_code == 2
+    assert "Regression gate failed" in result.output
+
+
+def test_eval_prints_deltas_vs_pinned_baseline_without_gates(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = tmp_path / "rag.yml"
+    write_default_config(config)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    _monkeypatch_runner(monkeypatch)
+    from rag_lab.eval import run_store
+
+    result = runner.invoke(app, _eval_args(tmp_path, config, golden, db))
+    assert result.exit_code == 0
+    run_id = run_store.list_runs(tmp_path / "runs")[0].run_id
+    runner.invoke(
+        app, ["eval", "--runs-dir", str(tmp_path / "runs"), "--set-baseline", run_id]
+    )
+
+    result = runner.invoke(app, _eval_args(tmp_path, config, golden, db))
+    assert result.exit_code == 0
+    assert "Δ vs baseline" in result.output

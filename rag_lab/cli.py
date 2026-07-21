@@ -7,11 +7,11 @@ from rag_lab import __version__, pipeline
 from rag_lab import config as config_mod
 from rag_lab import ingest as ingest_mod
 from rag_lab.eval import golden_set as golden_set_mod
-from rag_lab.eval.aggregate import aggregate_metrics
+from rag_lab.eval import run_store
 from rag_lab.eval.gates import gate_failures
 from rag_lab.eval.reporter import MarkdownReporter
+from rag_lab.eval import service
 from rag_lab.eval.run_artifact import prompt_version, read_run, write_run
-from rag_lab.eval.runner import EvalRunner
 from rag_lab.loaders.markdown import MarkdownLoader
 
 app = typer.Typer(no_args_is_help=True, help="rag-lab: local-first RAG framework")
@@ -272,6 +272,68 @@ def inspect_chunks(
         typer.echo("")
 
 
+def _new_run_id(runs_dir: Path, created_at: str) -> str:
+    base = created_at.replace(":", "").replace("-", "").replace("+0000", "")
+    base = base.replace("T", "-")[:15]
+    run_id = base
+    n = 2
+    while (runs_dir / run_id / "run.json").exists():
+        run_id = f"{base}-{n}"
+        n += 1
+    return run_id
+
+
+def _baseline_reference(
+    baseline: Path | None, runs_dir: Path, cfg: config_mod.Config
+) -> tuple[dict[str, float] | None, str]:
+    """Resolve the comparison reference: explicit --baseline artifact, else the pin."""
+    if baseline is not None:
+        try:
+            baseline_run = read_run(baseline)
+        except (OSError, ValueError) as exc:
+            typer.echo(f"Baseline run artifact is unreadable: {baseline}", err=True)
+            raise typer.Exit(code=1) from exc
+        if not isinstance(baseline_run, dict):
+            typer.echo(f"Baseline run artifact is not a run.json: {baseline}", err=True)
+            raise typer.Exit(code=1)
+        if baseline_run.get("k") != cfg.retriever.k:
+            typer.echo(
+                f"Baseline was built with k={baseline_run.get('k')} but this run uses "
+                f"k={cfg.retriever.k}; recall@k/ndcg@k are not comparable. "
+                "Rebuild the baseline or align k.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        return baseline_run.get("aggregates", {}), str(baseline)
+
+    pinned = run_store.get_baseline(runs_dir)
+    if pinned is None:
+        return None, ""
+    record = run_store.load_run(runs_dir, pinned)
+    if record.config.retriever.k != cfg.retriever.k:
+        typer.echo(
+            f"Pinned baseline {pinned} used k={record.config.retriever.k}, this run "
+            f"uses k={cfg.retriever.k}; skipping comparison.",
+            err=True,
+        )
+        return None, ""
+    return record.scores, f"baseline {record.name} ({pinned})"
+
+
+def _echo_baseline_deltas(
+    current: dict[str, float], reference: dict[str, float], label: str
+) -> None:
+    shared = sorted(set(current) & set(reference))
+    if not shared:
+        return
+    typer.echo(f"Δ vs {label}:")
+    for metric in shared:
+        delta = current[metric] - reference[metric]
+        typer.echo(
+            f"  {metric}: {current[metric]:.3f} ({reference[metric]:.3f} {delta:+.3f})"
+        )
+
+
 @app.command()
 def eval(  # noqa: A001
     golden: Path = typer.Option(Path("golden.yml"), "--golden", help="Golden set YAML."),
@@ -294,8 +356,28 @@ def eval(  # noqa: A001
         "--agent",
         help="Evaluate the LLM tool-orchestration agent instead of the fixed retriever.",
     ),
+    repeat: int = typer.Option(
+        1, "--repeat", min=1, help="Run the golden set N times and report mean ± stdev."
+    ),
+    set_baseline: str | None = typer.Option(
+        None,
+        "--set-baseline",
+        help="Pin RUN_ID as the baseline future runs are compared against, then exit.",
+    ),
+    runs_dir: Path = typer.Option(
+        Path(".rag-lab") / "runs", "--runs-dir", help="Run-store directory."
+    ),
 ) -> None:
     """Run the eval harness against a golden set and write a markdown report."""
+    if set_baseline is not None:
+        try:
+            run_store.set_baseline(runs_dir, set_baseline)
+        except ValueError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=1) from exc
+        typer.echo(f"Baseline pinned: {set_baseline}")
+        return
+
     if not golden.exists():
         typer.echo(f"Golden set not found: {golden}", err=True)
         raise typer.Exit(code=1)
@@ -310,84 +392,64 @@ def eval(  # noqa: A001
     _validate_embedder_model(cfg)
     store = pipeline.build_store(cfg, db)
     _require_compatible_index(store, cfg, force)
-    embedder = pipeline.build_embedder(cfg)
-    retriever = pipeline.build_retriever(store, embedder, cfg)
-    llm = pipeline.build_llm(cfg)
-
-    scorer = None
-    if cfg.eval.deepeval:
-        try:
-            from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
-
-            scorer = DeepEvalScorer(model=cfg.eval.deepeval_model or cfg.llm.model)
-        except ModuleNotFoundError as exc:
-            typer.echo(
-                "DeepEval is enabled but not installed. Run `uv sync --extra deepeval`.",
-                err=True,
-            )
-            raise typer.Exit(code=1) from exc
-    agent = (
-        pipeline.build_agent(store, embedder, cfg)
-        if (use_agent or cfg.agent.enabled)
-        else None
-    )
-    runner = EvalRunner(
-        retriever=retriever,
-        llm=llm,
-        k=cfg.retriever.k,
-        deepeval_scorer=scorer,
-        prompt_builder=pipeline.build_prompt_builder(cfg),
-        abstention_markers=cfg.eval.abstention_markers,
-        agent=agent,
-    )
+    try:
+        runner = service.build_runner(cfg, db, use_agent=use_agent)
+    except ModuleNotFoundError as exc:
+        if not cfg.eval.deepeval:
+            raise
+        typer.echo(
+            "DeepEval is enabled but not installed. Run `uv sync --extra deepeval`.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
 
     items = golden_set_mod.load_golden_set(golden)
-    typer.echo(f"Running {len(items)} questions...")
-    results = runner.run(items)
+    suffix = f" x{repeat}" if repeat > 1 else ""
+    typer.echo(f"Running {len(items)} questions{suffix}...")
+    repeats = [runner.run(items) for _ in range(repeat)]
+    flat = [r for one_pass in repeats for r in one_pass]
 
     summary = config_mod.config_summary(cfg)
+    created_at = datetime.now(UTC).isoformat(timespec="seconds")
     report.parent.mkdir(parents=True, exist_ok=True)
     MarkdownReporter().write(
-        results=results,
+        results=flat,
         config_summary=summary,
         out_path=report,
         previous_run=previous,
     )
     write_run(
         report.parent / "run.json",
-        results,
+        repeats=repeats,
         config_summary=summary,
         prompt_version=prompt_version(cfg.prompt.system_instructions),
         k=cfg.retriever.k,
-        created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        created_at=created_at,
     )
     typer.echo(f"Report written to {report}")
     typer.echo(f"Run artifact written to {report.parent / 'run.json'}")
 
-    if baseline is not None and cfg.eval.gates:
-        try:
-            baseline_run = read_run(baseline)
-        except (OSError, ValueError) as exc:
-            typer.echo(f"Baseline run artifact is unreadable: {baseline}", err=True)
-            raise typer.Exit(code=1) from exc
-        if not isinstance(baseline_run, dict):
-            typer.echo(f"Baseline run artifact is not a run.json: {baseline}", err=True)
-            raise typer.Exit(code=1)
-        if baseline_run.get("k") != cfg.retriever.k:
-            typer.echo(
-                f"Baseline was built with k={baseline_run.get('k')} but this run uses "
-                f"k={cfg.retriever.k}; recall@k/ndcg@k are not comparable. "
-                "Rebuild the baseline or align k.",
-                err=True,
-            )
-            raise typer.Exit(code=1)
-        prev = baseline_run.get("aggregates", {})
-        failures = gate_failures(aggregate_metrics(results), prev, cfg.eval.gates)
-        if failures:
-            typer.echo("Regression gate failed:", err=True)
-            for line in failures:
-                typer.echo(f"  {line}", err=True)
-            raise typer.Exit(code=2)
+    record = run_store.save_run(
+        runs_dir,
+        run_id=_new_run_id(runs_dir, created_at),
+        created_at=created_at,
+        corpus=str(db),
+        config=cfg,
+        repeats=repeats,
+        golden_hash=run_store.golden_hash(golden),
+    )
+    typer.echo(f"Run {record.run_id} saved to {runs_dir}")
+
+    reference, reference_label = _baseline_reference(baseline, runs_dir, cfg)
+    if reference is not None:
+        _echo_baseline_deltas(record.scores, reference, reference_label)
+        if cfg.eval.gates:
+            failures = gate_failures(record.scores, reference, cfg.eval.gates)
+            if failures:
+                typer.echo("Regression gate failed:", err=True)
+                for line in failures:
+                    typer.echo(f"  {line}", err=True)
+                raise typer.Exit(code=2)
 
 
 @app.command()
