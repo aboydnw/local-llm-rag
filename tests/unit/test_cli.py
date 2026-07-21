@@ -402,3 +402,28 @@ def test_eval_exits_1_when_baseline_k_differs(tmp_path: Path, monkeypatch) -> No
     )
     assert result.exit_code == 1
     assert (tmp_path / "report.md").exists()
+
+
+def test_eval_exits_1_when_baseline_gated_metric_not_finite(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import json
+
+    config = _gated_config(tmp_path)
+    golden = tmp_path / "golden.yml"
+    golden.write_text("- id: q1\n  question: hi\n  ideal_docs: [a.md]\n", encoding="utf-8")
+    db = tmp_path / "rag.db"
+    _build_matching_index(db, config)
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps({"k": 5, "aggregates": {"recall@k": "bad"}}), encoding="utf-8"
+    )
+    _monkeypatch_runner(monkeypatch)
+
+    result = runner.invoke(
+        app,
+        ["eval", "--config", str(config), "--db", str(db), "--golden", str(golden),
+         "--baseline", str(baseline), "--report", str(tmp_path / "report.md")],
+    )
+    assert result.exit_code == 1
+    assert result.exception is None or isinstance(result.exception, SystemExit)

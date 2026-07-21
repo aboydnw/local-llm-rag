@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -381,7 +382,21 @@ def eval(  # noqa: A001
                 err=True,
             )
             raise typer.Exit(code=1)
-        prev = baseline_run.get("aggregates", {})
+        prev = baseline_run.get("aggregates")
+        if not isinstance(prev, dict):
+            typer.echo(f"Baseline run artifact has no aggregates: {baseline}", err=True)
+            raise typer.Exit(code=1)
+        for metric in cfg.eval.gates:
+            if metric not in prev:
+                continue
+            value = prev[metric]
+            if not isinstance(value, int | float) or not math.isfinite(value):
+                typer.echo(
+                    f"Baseline aggregate for {metric!r} is not a finite number: "
+                    f"{value!r}",
+                    err=True,
+                )
+                raise typer.Exit(code=1)
         failures = gate_failures(aggregate_metrics(results), prev, cfg.eval.gates)
         if failures:
             typer.echo("Regression gate failed:", err=True)
