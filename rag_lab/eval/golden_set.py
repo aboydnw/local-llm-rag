@@ -13,6 +13,17 @@ class GoldenItem(BaseModel):
     expect_abstention: bool = False
 
 
+def append_golden_case(path: Path, item: GoldenItem) -> None:
+    """Append one case to the golden-set YAML, validating ids stay unique."""
+    existing = load_golden_set(path) if path.exists() else []
+    if any(other.id == item.id for other in existing):
+        raise ValueError(f"duplicate golden id: {item.id}")
+    entries = [i.model_dump(exclude_defaults=True) | {"id": i.id, "question": i.question}
+               for i in [*existing, item]]
+    path.write_text(yaml.safe_dump(entries, sort_keys=False, allow_unicode=True))
+    load_golden_set(path)
+
+
 def load_golden_set(path: Path) -> list[GoldenItem]:
     raw = yaml.safe_load(path.read_text()) or []
     if not isinstance(raw, list):

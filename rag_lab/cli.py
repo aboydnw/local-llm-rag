@@ -272,17 +272,6 @@ def inspect_chunks(
         typer.echo("")
 
 
-def _new_run_id(runs_dir: Path, created_at: str) -> str:
-    base = created_at.replace(":", "").replace("-", "").replace("+0000", "")
-    base = base.replace("T", "-")[:15]
-    run_id = base
-    n = 2
-    while (runs_dir / run_id / "run.json").exists():
-        run_id = f"{base}-{n}"
-        n += 1
-    return run_id
-
-
 def _baseline_reference(
     baseline: Path | None, runs_dir: Path, cfg: config_mod.Config
 ) -> tuple[dict[str, float] | None, str]:
@@ -431,7 +420,7 @@ def eval(  # noqa: A001
 
     record = run_store.save_run(
         runs_dir,
-        run_id=_new_run_id(runs_dir, created_at),
+        run_id=run_store.new_run_id(runs_dir, created_at),
         created_at=created_at,
         corpus=str(db),
         config=cfg,
@@ -450,6 +439,20 @@ def eval(  # noqa: A001
                 for line in failures:
                     typer.echo(f"  {line}", err=True)
                 raise typer.Exit(code=2)
+
+
+@app.command()
+def mcp() -> None:
+    """Serve the eval harness as MCP tools over stdio (requires the 'mcp' extra)."""
+    try:
+        from rag_lab import mcp_server
+    except ModuleNotFoundError as exc:
+        typer.echo(
+            "The MCP server needs the optional 'mcp' extra. Run `uv sync --extra mcp`.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+    mcp_server.main()
 
 
 @app.command()

@@ -81,6 +81,18 @@ def _aggregate_scores(
     return means, stds
 
 
+def new_run_id(runs_dir: Path, created_at: str) -> str:
+    """Timestamp-derived run id, suffixed to dodge same-second collisions."""
+    base = created_at.replace(":", "").replace("-", "").replace("+0000", "")
+    base = base.replace("T", "-")[:15]
+    run_id = base
+    n = 2
+    while (runs_dir / run_id / "run.json").exists():
+        run_id = f"{base}-{n}"
+        n += 1
+    return run_id
+
+
 def save_run(
     runs_dir: Path,
     *,
