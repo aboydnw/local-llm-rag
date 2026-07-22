@@ -134,6 +134,34 @@ def test_get_baseline_none_when_pinned_run_deleted(tmp_path):
     assert run_store.get_baseline(runs_dir) is None
 
 
+def _rec(run_id, corpus, created_at, sweep=None):
+    prov = {"sweep_id": sweep} if sweep else {}
+    return run_store.RunRecord(
+        run_id=run_id, name=run_id, created_at=created_at,
+        corpus=corpus, scores={}, config=Config(), provenance=prov,
+    )
+
+
+def test_latest_sweep_ids_picks_newest_per_corpus():
+    records = [
+        _rec("a", "c1", "2026-07-20T00:00:00", sweep="old"),
+        _rec("b", "c1", "2026-07-22T00:00:00", sweep="new"),
+        _rec("c", "c2", "2026-07-21T00:00:00", sweep="other"),
+    ]
+    assert run_store.latest_sweep_ids(records) == {"c1": "new", "c2": "other"}
+
+
+def test_visible_runs_hides_superseded_sweeps_keeps_custom():
+    records = [
+        _rec("a", "c1", "2026-07-20T00:00:00", sweep="old"),
+        _rec("b", "c1", "2026-07-22T00:00:00", sweep="new"),
+        _rec("custom", "c1", "2026-07-19T00:00:00"),
+    ]
+    visible = run_store.visible_runs(records)
+    assert {r.run_id for r in visible} == {"b", "custom"}
+    assert len(run_store.visible_runs(records, show_older_sweeps=True)) == 3
+
+
 def test_config_hash_stable_and_sensitive(tmp_path):
     a = Config()
     b = Config()

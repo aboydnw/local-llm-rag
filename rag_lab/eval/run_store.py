@@ -170,6 +170,37 @@ def save_run(
     )
 
 
+def sweep_id(record: RunRecord) -> str | None:
+    """The sweep this run belongs to, or None for custom runs."""
+    return record.provenance.get("sweep_id")
+
+
+def latest_sweep_ids(records: list[RunRecord]) -> dict[str, str]:
+    """Newest sweep id per corpus, judged by created_at."""
+    latest: dict[str, tuple[str, str]] = {}
+    for record in records:
+        sid = sweep_id(record)
+        if sid is None:
+            continue
+        current = latest.get(record.corpus)
+        if current is None or record.created_at > current[0]:
+            latest[record.corpus] = (record.created_at, sid)
+    return {corpus: sid for corpus, (_, sid) in latest.items()}
+
+
+def visible_runs(
+    records: list[RunRecord], *, show_older_sweeps: bool = False
+) -> list[RunRecord]:
+    """Hide runs from superseded sweeps; custom runs are always visible."""
+    if show_older_sweeps:
+        return list(records)
+    latest = latest_sweep_ids(records)
+    return [
+        r for r in records
+        if sweep_id(r) is None or sweep_id(r) == latest.get(r.corpus)
+    ]
+
+
 def _record_from_json(data: dict) -> RunRecord:
     return RunRecord(
         run_id=data["run_id"],
