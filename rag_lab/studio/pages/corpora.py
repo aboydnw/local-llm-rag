@@ -1,6 +1,6 @@
 import streamlit as st
 
-from rag_lab.studio import build_settings, config_logic
+from rag_lab.studio import build_settings, config_logic, feedback
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.corpora import Corpus, Source
@@ -126,7 +126,8 @@ def render() -> None:
     if col1.button("Build index", type="primary", disabled=not corpus.sources):
         try:
             with st.spinner("Building index (cloning repos)..."):
-                indexer_mod.build_index(ws, corpus, cfg)
+                with feedback.instrument("index_build", corpus=corpus.name):
+                    indexer_mod.build_index(ws, corpus, cfg)
             st.toast("Index built")
             st.rerun()
         except Exception as exc:  # noqa: BLE001

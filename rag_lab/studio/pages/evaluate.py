@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from rag_lab.studio import config_panel, experiments
+from rag_lab.studio import config_panel, experiments, feedback
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio.workspace import Workspace
@@ -63,13 +63,14 @@ def render() -> None:
             return
         with st.spinner("Running eval..."):
             try:
-                record = experiments.run_eval(
-                    ws, corpus, cfg, golden,
-                    run_id=uuid.uuid4().hex[:8],
-                    created_at=datetime.now(UTC).isoformat(timespec="seconds"),
-                    name=name or None,
-                    repeat=repeat,
-                )
+                with feedback.instrument("eval", name=name or None):
+                    record = experiments.run_eval(
+                        ws, corpus, cfg, golden,
+                        run_id=uuid.uuid4().hex[:8],
+                        created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+                        name=name or None,
+                        repeat=repeat,
+                    )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Eval failed: {exc}")
                 return
