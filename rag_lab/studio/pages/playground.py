@@ -3,7 +3,7 @@ import streamlit as st
 from rag_lab.agent.agent import trace_dict
 from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
-from rag_lab.studio import components, config_panel, trace_view
+from rag_lab.studio import components, config_panel, feedback, trace_view
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
 from rag_lab.studio import share as share_mod
@@ -52,7 +52,8 @@ def render() -> None:
     with st.spinner("Retrieving..."):
         try:
             retriever = components.build_retriever(store, embedder, cfg)
-            results = retriever.retrieve(question, k=cfg.retriever.k)
+            with feedback.instrument("retrieval", question=question, k=cfg.retriever.k):
+                results = retriever.retrieve(question, k=cfg.retriever.k)
             prompt = PromptBuilder(
                 system_instructions=cfg.prompt.system_instructions
             ).build(question=question, results=results)
@@ -62,7 +63,8 @@ def render() -> None:
 
     st.subheader("Answer")
     try:
-        answer = st.write_stream(components.build_llm(cfg).stream(prompt))
+        with feedback.instrument("generation"):
+            answer = st.write_stream(components.build_llm(cfg).stream(prompt))
     except Exception as exc:  # noqa: BLE001
         st.error(f"Generation failed: {exc}")
         return
@@ -86,7 +88,8 @@ def _render_agent_run(store, embedder, cfg, question: str) -> None:
     with st.spinner("Agent reasoning..."):
         try:
             agent = components.build_agent(store, embedder, cfg)
-            result = agent.run(question)
+            with feedback.instrument("agent_run", question=question):
+                result = agent.run(question)
         except Exception as exc:  # noqa: BLE001
             st.error(f"Agent run failed: {exc}")
             return
