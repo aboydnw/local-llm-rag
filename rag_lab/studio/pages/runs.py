@@ -1,9 +1,11 @@
+from datetime import UTC, datetime
+
 import streamlit as st
 
 from rag_lab.config import config_summary
 from rag_lab.eval import run_store
 from rag_lab.eval.gates import gate_failures
-from rag_lab.studio import experiments, trace_view
+from rag_lab.studio import charts, experiments, trace_view
 from rag_lab.studio.workspace import Workspace
 
 _CORE_ITEM_METRICS = (
@@ -19,29 +21,104 @@ def _score_cell(record, metric: str) -> str:
     return f"{value:.3f} ±{std:.3f}" if std is not None else f"{value:.3f}"
 
 
-def _leaderboard(runs, baseline_id, baseline) -> None:
+def _ago(created_at: str) -> str:
+    try:
+        then = datetime.fromisoformat(created_at)
+    except ValueError:
+        return created_at
+    delta = datetime.now(UTC) - then
+    if delta.days > 0:
+        return f"{delta.days}d ago"
+    hours = delta.seconds // 3600
+    return f"{hours}h ago" if hours else f"{delta.seconds // 60}m ago"
+
+
+def _sweep_section(ws, corpus, runs) -> None:
+    st.subheader("Base sweep")
+    swept = experiments.latest_sweep_records(ws, corpus)
+    if not swept:
+        st.caption("Never swept — run the base set from the Evaluate page.")
+        return
+    custom = [r for r in runs if run_store.sweep_id(r) is None]
+    st.altair_chart(charts.sweep_heatmap(swept + custom), use_container_width=True)
+    st.caption(
+        "Darker = better within each column. recall@k and mrr are deterministic; "
+        "keyword coverage is a single noisy generation pass."
+    )
+
+
+def _custom_runs_section(ws, corpus, runs) -> None:
+    st.subheader("Custom runs")
+    custom = [r for r in runs if run_store.sweep_id(r) is None]
+    if not custom:
+        st.caption("No custom runs for this corpus yet.")
+        return
+    baseline_id = experiments.get_baseline(ws, corpus)
+    baseline = experiments.load_run(ws, baseline_id) if baseline_id else None
     rows = []
-    for r in runs:
-        row = {"run": r.name, "id": r.run_id, "when": r.created_at}
-        if r.run_id == baseline_id:
-            row["run"] = f"★ {r.name}"
+    for r in custom:
+        row = {
+            "id": r.run_id,
+            "name": f"★ {r.name}" if r.run_id == baseline_id else r.name,
+            "when": _ago(r.created_at),
+        }
         row.update({k: _score_cell(r, k) for k in sorted(r.scores)})
         if baseline is not None and r.run_id != baseline_id:
             gates = r.config.eval.gates
             regressed = gates and gate_failures(r.scores, baseline.scores, gates)
             row["vs baseline"] = "▼ regressed" if regressed else "ok"
-        if r.repeat > 1:
-            row["repeats"] = r.repeat
         row["config"] = config_summary(r.config)
         rows.append(row)
-    st.subheader("Leaderboard")
-    if baseline_id:
-        st.caption(f"★ = pinned baseline ({baseline_id}); ▼ = gated metric regressed.")
-    st.dataframe(rows, use_container_width=True)
+    edited = st.data_editor(
+        rows, use_container_width=True, hide_index=True, key=f"runs_editor_{corpus}",
+        column_config={"id": None},
+        disabled=[c for c in rows[0] if c != "name"],
+    )
+    for before, after in zip(rows, edited, strict=True):
+        new = after["name"].removeprefix("★ ").strip()
+        if new and new != before["name"].removeprefix("★ "):
+            experiments.rename_run(ws, before["id"], new)
+            st.rerun()
+
+    ids = [r.run_id for r in custom]
+    labels = {r.run_id: f"{r.name} ({r.run_id})" for r in custom}
+    sel = st.selectbox("Manage a run", ids, format_func=lambda i: labels[i], key="manage")
+    c1, c2, c3 = st.columns(3)
+    if c1.button("Pin as baseline"):
+        experiments.set_baseline(ws, sel)
+        st.rerun()
+    if c2.button("Delete"):
+        experiments.delete_run(ws, sel)
+        st.rerun()
+    if c3.button("View report"):
+        report = ws.run_dir(sel) / "report.md"
+        if report.exists():
+            st.markdown(report.read_text())
+
+
+def _compare_section(ws, ids, labels) -> None:
+    st.subheader("Compare two runs")
+    if len(ids) < 2:
+        st.caption("Need at least two runs for this corpus to compare.")
+        return
+    col_a, col_b = st.columns(2)
+    a_id = col_a.selectbox("Run A", ids, format_func=lambda i: labels[i], key="cmp_a")
+    b_id = col_b.selectbox("Run B", ids, format_func=lambda i: labels[i],
+                           index=min(1, len(ids) - 1), key="cmp_b")
+    if a_id and b_id and a_id != b_id:
+        a, b = experiments.load_run(ws, a_id), experiments.load_run(ws, b_id)
+        st.altair_chart(charts.compare_heatmap(a, b), use_container_width=True)
+        result = experiments.diff(a, b)
+        st.write("**Changed knobs:** " + (", ".join(result["changed_knobs"]) or "none"))
+        with st.expander("Delta table"):
+            st.table({m: [round(d, 3)] for m, d in result["metric_deltas"].items()})
 
 
 def _inspector(ws, ids, labels) -> None:
     st.subheader("Inspect a run, question by question")
+    if not ids:
+        st.caption("No runs for this corpus.")
+        return
     run_id = st.selectbox("Run", ids, format_func=lambda i: labels[i], key="inspect_run")
     record = experiments.load_run(ws, run_id)
     items = experiments.load_run_items(ws, run_id)
@@ -55,7 +132,7 @@ def _inspector(ws, ids, labels) -> None:
         if not gates:
             st.info("No eval.gates configured — showing all questions.")
         else:
-            baseline_id = experiments.get_baseline(ws)
+            baseline_id = experiments.get_baseline(ws, record.corpus)
             reference = (
                 experiments.load_run(ws, baseline_id).scores
                 if baseline_id
@@ -100,47 +177,27 @@ def _inspector(ws, ids, labels) -> None:
 
 
 def render() -> None:
-    """Render the Runs page: leaderboard, baseline pin, compare, and drill-down."""
+    """Render the Runs page: per-corpus sweeps, custom runs, compare, drill-down."""
     st.title("Runs")
     ws = Workspace.default()
-    runs = experiments.list_runs(ws)
-    if not runs:
-        st.info("No runs yet. Run an eval to populate the leaderboard.")
+    all_runs = experiments.list_runs(ws)
+    if not all_runs:
+        st.info("No runs yet. Run an eval to populate this page.")
         return
 
-    baseline_id = experiments.get_baseline(ws)
-    baseline = experiments.load_run(ws, baseline_id) if baseline_id else None
-    _leaderboard(runs, baseline_id, baseline)
+    corpora = sorted({r.corpus for r in all_runs})
+    default = st.session_state.get("corpus_name")
+    corpus = st.selectbox(
+        "Corpus", corpora,
+        index=corpora.index(default) if default in corpora else 0,
+    )
+    show_old = st.toggle("Show older sweeps", value=False)
+    runs = [r for r in run_store.visible_runs(all_runs, show_older_sweeps=show_old)
+            if r.corpus == corpus]
 
+    _sweep_section(ws, corpus, runs)
+    _custom_runs_section(ws, corpus, runs)
     ids = [r.run_id for r in runs]
     labels = {r.run_id: f"{r.name} ({r.run_id})" for r in runs}
-
-    st.subheader("Compare two runs")
-    col_a, col_b = st.columns(2)
-    a_id = col_a.selectbox("Run A", ids, format_func=lambda i: labels[i], key="cmp_a")
-    b_id = col_b.selectbox("Run B", ids, format_func=lambda i: labels[i],
-                           index=min(1, len(ids) - 1), key="cmp_b")
-    if a_id and b_id and a_id != b_id:
-        result = experiments.diff(experiments.load_run(ws, a_id), experiments.load_run(ws, b_id))
-        st.write("**Changed knobs:** " + (", ".join(result["changed_knobs"]) or "none"))
-        st.table({m: [round(d, 3)] for m, d in result["metric_deltas"].items()})
-
-    st.subheader("Manage a run")
-    sel = st.selectbox("Run", ids, format_func=lambda i: labels[i], key="manage")
-    new_name = st.text_input("Rename to", key="rename_box")
-    c1, c2, c3, c4 = st.columns(4)
-    if c1.button("Rename") and new_name:
-        experiments.rename_run(ws, sel, new_name)
-        st.rerun()
-    if c2.button("Pin as baseline"):
-        experiments.set_baseline(ws, sel)
-        st.rerun()
-    if c3.button("Delete"):
-        experiments.delete_run(ws, sel)
-        st.rerun()
-    if c4.button("View report"):
-        report = ws.run_dir(sel) / "report.md"
-        if report.exists():
-            st.markdown(report.read_text())
-
+    _compare_section(ws, ids, labels)
     _inspector(ws, ids, labels)

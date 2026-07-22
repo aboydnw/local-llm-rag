@@ -36,11 +36,11 @@ def _render(rows: list[dict], order: list[str]) -> alt.Chart:
     base = alt.Chart(alt.Data(values=rows))
     x = alt.X("metric:N", sort=list(CORE_METRICS), title=None)
     y = alt.Y("run:N", sort=order, title=None)
-    cells = base.transform_filter("!datum.is_delta").mark_rect(
-        stroke="#ffffff", strokeWidth=2
-    ).encode(
+    cells = base.transform_filter("!datum.is_delta").mark_rect().encode(
         x=x, y=y,
         color=alt.Color("shade:Q", scale=alt.Scale(scheme="blues"), legend=None),
+        stroke=alt.condition("datum.is_custom", alt.value("#111827"), alt.value("#ffffff")),
+        strokeWidth=alt.condition("datum.is_custom", alt.value(2.5), alt.value(2)),
     )
     labels = base.mark_text(fontWeight="bold").encode(
         x=x, y=y,
