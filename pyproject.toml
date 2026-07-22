@@ -26,6 +26,7 @@ dev = [
 ]
 studio = [
     "streamlit>=1.36",
+    "altair>=5",
 ]
 deepeval = [
     "deepeval>=2.0",
