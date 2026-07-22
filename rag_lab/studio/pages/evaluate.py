@@ -46,16 +46,21 @@ def _sweep_section(ws, corpus, cfg, golden) -> None:
 def _seed_from(ws, corpus, cfg):
     labels = {f"preset: {p.name}": p for p in presets_mod.PRESETS}
     corpus_runs = [r for r in experiments.list_runs(ws) if r.corpus == corpus.label]
-    labels.update({f"run: {r.name}": r for r in corpus_runs})
+    labels.update({f"run: {r.name} ({r.run_id})": r for r in corpus_runs})
     pick = st.selectbox("Start from", ["(current config)", *labels], key="start_from")
     if pick == "(current config)":
+        st.session_state.pop("seeded_from", None)
         return cfg
-    chosen = labels[pick]
-    if isinstance(chosen, presets_mod.Preset):
-        cfg = presets_mod.apply_preset(cfg, chosen)
-    else:
-        cfg.retriever = chosen.config.retriever.model_copy(deep=True)
-    st.caption(f"Retrieval knobs loaded from {pick}.")
+    if st.session_state.get("seeded_from") != pick:
+        chosen = labels[pick]
+        if isinstance(chosen, presets_mod.Preset):
+            cfg = presets_mod.apply_preset(cfg, chosen)
+        else:
+            cfg.retriever = chosen.config.retriever.model_copy(deep=True)
+        st.session_state["config"] = cfg
+        st.session_state["seeded_from"] = pick
+        st.rerun()
+    st.caption(f"Retrieval knobs loaded from {pick}. Tune the knobs above to fine-tune.")
     return cfg
 
 

@@ -39,8 +39,7 @@ def _sweep_section(ws, corpus, runs) -> None:
     if not swept:
         st.caption("Never swept — run the base set from the Evaluate page.")
         return
-    custom = [r for r in runs if run_store.sweep_id(r) is None]
-    st.altair_chart(charts.sweep_heatmap(swept + custom), use_container_width=True)
+    st.altair_chart(charts.sweep_heatmap(runs), use_container_width=True)
     st.caption(
         "Darker = better within each column. recall@k and mrr are deterministic; "
         "keyword coverage is a single noisy generation pass."

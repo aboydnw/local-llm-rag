@@ -5,9 +5,9 @@ from rag_lab.eval.run_store import RunRecord
 from rag_lab.studio import charts
 
 
-def _rec(name, recall, mrr, sweep="s1"):
+def _rec(name, recall, mrr, sweep="s1", run_id=None):
     prov = {"sweep_id": sweep, "preset": name} if sweep else {}
-    return RunRecord(run_id=name, name=name, created_at="t", corpus="c1",
+    return RunRecord(run_id=run_id or name, name=name, created_at="t", corpus="c1",
                      scores={"recall_at_k": recall, "mrr": mrr},
                      config=Config(), provenance=prov)
 
@@ -35,6 +35,18 @@ def test_heatmap_shade_single_value_column_is_full():
 def test_heatmap_rows_flags_custom_runs():
     rows = charts.heatmap_rows([_rec("base", 0.5, 0.4), _rec("mine", 0.6, 0.5, sweep=None)])
     assert {r["run"] for r in rows if r["is_custom"]} == {"mine"}
+
+
+def test_heatmap_rows_disambiguate_colliding_names():
+    a = _rec("base: vector", 0.5, 0.4, run_id="aaaaaa11")
+    b = _rec("base: vector", 0.9, 0.7, run_id="bbbbbb22")
+    runs = {r["run"] for r in charts.heatmap_rows([a, b])}
+    assert runs == {"base: vector (aaaaaa)", "base: vector (bbbbbb)"}
+
+
+def test_heatmap_rows_keeps_plain_names_when_unique():
+    rows = charts.heatmap_rows([_rec("vector", 0.5, 0.4), _rec("bm25", 0.9, 0.7)])
+    assert {r["run"] for r in rows} == {"vector", "bm25"}
 
 
 def test_sweep_heatmap_is_layered_chart():
