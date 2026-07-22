@@ -57,3 +57,12 @@ def test_sweep_heatmap_is_layered_chart():
 def test_compare_heatmap_has_delta_row():
     spec = charts.compare_heatmap(_rec("a", 0.5, 0.4), _rec("b", 0.9, 0.7)).to_dict()
     assert "Δ (B − A)" in json.dumps(spec, ensure_ascii=False)
+
+
+def test_compare_heatmap_delta_label_avoids_run_name_collision():
+    a = _rec("Δ (B − A)", 0.5, 0.4, run_id="aaaaaa11")
+    b = _rec("plain", 0.9, 0.7, run_id="bbbbbb22")
+    values = charts.compare_heatmap(a, b).to_dict()["data"]["values"]
+    delta_labels = {v["run"] for v in values if v.get("is_delta")}
+    assert delta_labels == {"Δ (B − A) [2]"}
+    assert not any(v["run"] in delta_labels and not v.get("is_delta") for v in values)

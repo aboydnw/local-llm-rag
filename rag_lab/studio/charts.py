@@ -87,6 +87,10 @@ def compare_heatmap(a: RunRecord, b: RunRecord) -> alt.Chart:
         if row["run"] not in order:
             order.append(row["run"])
     delta_label = "Δ (B − A)"
+    suffix = 2
+    while delta_label in order:
+        delta_label = f"Δ (B − A) [{suffix}]"
+        suffix += 1
     for metric in CORE_METRICS:
         if metric in a.scores and metric in b.scores:
             rows.append({
