@@ -112,6 +112,15 @@ def list_runs(workspace: Workspace) -> list[RunRecord]:
     return run_store.list_runs(workspace.runs_dir)
 
 
+def latest_sweep_records(workspace: Workspace, corpus: str) -> list[RunRecord]:
+    """Records of the newest sweep for a corpus, or [] when never swept."""
+    records = [r for r in list_runs(workspace) if r.corpus == corpus]
+    sid = run_store.latest_sweep_ids(records).get(corpus)
+    if sid is None:
+        return []
+    return [r for r in records if r.provenance.get("sweep_id") == sid]
+
+
 def load_run(workspace: Workspace, run_id: str) -> RunRecord:
     return run_store.load_run(workspace.runs_dir, run_id)
 
