@@ -273,7 +273,7 @@ def inspect_chunks(
 
 
 def _baseline_reference(
-    baseline: Path | None, runs_dir: Path, cfg: config_mod.Config
+    baseline: Path | None, runs_dir: Path, cfg: config_mod.Config, corpus: str
 ) -> tuple[dict[str, float] | None, str]:
     """Resolve the comparison reference: explicit --baseline artifact, else the pin."""
     if baseline is not None:
@@ -310,7 +310,7 @@ def _baseline_reference(
                 raise typer.Exit(code=1)
         return prev, str(baseline)
 
-    pinned = run_store.get_baseline(runs_dir)
+    pinned = run_store.get_baseline(runs_dir, corpus)
     if pinned is None:
         return None, ""
     record = run_store.load_run(runs_dir, pinned)
@@ -444,7 +444,7 @@ def eval(  # noqa: A001
     )
     typer.echo(f"Run {record.run_id} saved to {runs_dir}")
 
-    reference, reference_label = _baseline_reference(baseline, runs_dir, cfg)
+    reference, reference_label = _baseline_reference(baseline, runs_dir, cfg, str(db))
     if reference is not None:
         _echo_baseline_deltas(record.scores, reference, reference_label)
         if cfg.eval.gates:

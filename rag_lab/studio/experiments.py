@@ -132,8 +132,8 @@ def set_baseline(workspace: Workspace, run_id: str) -> None:
     run_store.set_baseline(workspace.runs_dir, run_id)
 
 
-def get_baseline(workspace: Workspace) -> str | None:
-    return run_store.get_baseline(workspace.runs_dir)
+def get_baseline(workspace: Workspace, corpus: str) -> str | None:
+    return run_store.get_baseline(workspace.runs_dir, corpus)
 
 
 def diff(run_a: RunRecord, run_b: RunRecord) -> dict:

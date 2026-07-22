@@ -256,24 +256,48 @@ def delete_run(runs_dir: Path, run_id: str) -> None:
         shutil.rmtree(run_path)
 
 
-def set_baseline(runs_dir: Path, run_id: str) -> None:
-    """Pin a run as the baseline every future run is compared against."""
-    if not (runs_dir / run_id / "run.json").exists():
-        raise ValueError(f"unknown run: {run_id}")
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    (runs_dir / BASELINE_FILE).write_text(json.dumps({"run_id": run_id}))
-
-
-def get_baseline(runs_dir: Path) -> str | None:
-    """The pinned baseline run id, or None if unset or pointing at a deleted run."""
-    pin = runs_dir / BASELINE_FILE
-    if not pin.exists():
+def _run_corpus(runs_dir: Path, run_id: str) -> str | None:
+    run_json = runs_dir / run_id / "run.json"
+    if not run_json.exists():
         return None
     try:
-        run_id = json.loads(pin.read_text())["run_id"]
-    except (ValueError, KeyError):
+        return json.loads(run_json.read_text()).get("corpus")
+    except ValueError:
         return None
-    if not (runs_dir / run_id / "run.json").exists():
+
+
+def _load_baselines(runs_dir: Path) -> dict[str, str]:
+    pin = runs_dir / BASELINE_FILE
+    if not pin.exists():
+        return {}
+    try:
+        data = json.loads(pin.read_text())
+    except ValueError:
+        return {}
+    if "baselines" in data:
+        return dict(data["baselines"])
+    run_id = data.get("run_id")
+    if not run_id:
+        return {}
+    corpus = _run_corpus(runs_dir, run_id)
+    return {corpus: run_id} if corpus else {}
+
+
+def set_baseline(runs_dir: Path, run_id: str) -> None:
+    """Pin a run as the baseline for its corpus."""
+    corpus = _run_corpus(runs_dir, run_id)
+    if corpus is None:
+        raise ValueError(f"unknown run: {run_id}")
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    baselines = _load_baselines(runs_dir)
+    baselines[corpus] = run_id
+    (runs_dir / BASELINE_FILE).write_text(json.dumps({"baselines": baselines}))
+
+
+def get_baseline(runs_dir: Path, corpus: str) -> str | None:
+    """The pinned baseline run id for a corpus, or None if unset or deleted."""
+    run_id = _load_baselines(runs_dir).get(corpus)
+    if run_id is None or not (runs_dir / run_id / "run.json").exists():
         return None
     return run_id
 

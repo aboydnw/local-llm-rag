@@ -107,10 +107,10 @@ def test_run_eval_repeat_records_std(tmp_path):
 
 
 def test_baseline_pin_via_workspace(tmp_path):
-    ws, _ = _run(tmp_path, "r1")
-    assert experiments.get_baseline(ws) is None
+    ws, record = _run(tmp_path, "r1")
+    assert experiments.get_baseline(ws, record.corpus) is None
     experiments.set_baseline(ws, "r1")
-    assert experiments.get_baseline(ws) == "r1"
+    assert experiments.get_baseline(ws, record.corpus) == "r1"
 
 
 def test_run_eval_persists_run(tmp_path):

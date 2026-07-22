@@ -116,9 +116,9 @@ def test_diff_reports_changed_knobs_and_deltas(tmp_path):
 
 def test_baseline_pin_set_get(tmp_path):
     runs_dir, _ = _save(tmp_path, "r1")
-    assert run_store.get_baseline(runs_dir) is None
+    assert run_store.get_baseline(runs_dir, "docs/") is None
     run_store.set_baseline(runs_dir, "r1")
-    assert run_store.get_baseline(runs_dir) == "r1"
+    assert run_store.get_baseline(runs_dir, "docs/") == "r1"
 
 
 def test_set_baseline_rejects_unknown_run(tmp_path):
@@ -131,7 +131,28 @@ def test_get_baseline_none_when_pinned_run_deleted(tmp_path):
     runs_dir, _ = _save(tmp_path, "r1")
     run_store.set_baseline(runs_dir, "r1")
     run_store.delete_run(runs_dir, "r1")
-    assert run_store.get_baseline(runs_dir) is None
+    assert run_store.get_baseline(runs_dir, "docs/") is None
+
+
+def test_baseline_is_per_corpus(tmp_path):
+    runs_dir = tmp_path / "runs"
+    for rid, corpus in [("r1", "c1"), ("r2", "c2")]:
+        run_store.save_run(runs_dir, run_id=rid, created_at="t", corpus=corpus,
+                           config=Config(), repeats=[[_result()]])
+    run_store.set_baseline(runs_dir, "r1")
+    run_store.set_baseline(runs_dir, "r2")
+    assert run_store.get_baseline(runs_dir, "c1") == "r1"
+    assert run_store.get_baseline(runs_dir, "c2") == "r2"
+    assert run_store.get_baseline(runs_dir, "c3") is None
+
+
+def test_legacy_single_pin_migrates_to_its_corpus(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_store.save_run(runs_dir, run_id="r1", created_at="t", corpus="c1",
+                       config=Config(), repeats=[[_result()]])
+    (runs_dir / run_store.BASELINE_FILE).write_text('{"run_id": "r1"}')
+    assert run_store.get_baseline(runs_dir, "c1") == "r1"
+    assert run_store.get_baseline(runs_dir, "c2") is None
 
 
 def _rec(run_id, corpus, created_at, sweep=None):
