@@ -29,6 +29,11 @@ def _render_corpus(session) -> None:
     st.caption(f"Golden set: `{session['golden']}`")
 
 
+def render_corpus_picker(session) -> None:
+    """Render the corpus selectbox outside the config expander."""
+    _render_corpus(session)
+
+
 def _render_retrieval_method(cfg: Config) -> None:
     st.subheader("Retrieval method")
     modes = ["direct", "agentic"]
@@ -160,7 +165,7 @@ def _render_actions(cfg: Config) -> None:
             st.error(f"Failed to save rag.yml: {exc}")
 
 
-def render(session, page_key: str) -> Config:
+def render(session, page_key: str, include_corpus: bool = True) -> Config:
     """Render the shared config panel inside a collapsible expander; return the current config."""
     cfg: Config = session["config"]
     try:
@@ -187,7 +192,8 @@ def render(session, page_key: str) -> Config:
         st.caption(f"{config_summary(cfg)}  ·  {status_badge}")
         if status_error is not None:
             st.info(f"Index status unavailable: {status_error}")
-        _render_corpus(session)
+        if include_corpus:
+            _render_corpus(session)
         _render_retrieval_method(cfg)
         _render_models(cfg, installed, ollama_error)
         _render_prompt(cfg)
