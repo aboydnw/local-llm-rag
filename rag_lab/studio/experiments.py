@@ -26,6 +26,7 @@ def run_eval(
     loader=None,
     embedder=None,
     llm=None,
+    extra_provenance: dict[str, str] | None = None,
 ) -> RunRecord:
     """Build (or reuse) the corpus index, run the golden set, and persist the run."""
     db_path = indexer_mod.ensure_index(
@@ -68,6 +69,7 @@ def run_eval(
         repeats=repeats,
         golden_hash=run_store.golden_hash(golden_path),
         corpus_snapshot=corpus.to_dict(),
+        extra_provenance=extra_provenance,
     )
 
 

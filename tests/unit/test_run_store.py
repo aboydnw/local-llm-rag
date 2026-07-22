@@ -48,6 +48,21 @@ def test_save_run_records_provenance(tmp_path):
     assert data["provenance"]["config_hash"] == run_store.config_hash(Config())
 
 
+def test_save_run_merges_extra_provenance(tmp_path):
+    record = run_store.save_run(
+        tmp_path / "runs",
+        run_id="r-sweep",
+        created_at="2026-07-22T00:00:00+00:00",
+        corpus="docs/",
+        config=Config(),
+        repeats=[[_result()]],
+        extra_provenance={"sweep_id": "s1", "preset": "vector"},
+    )
+    assert record.provenance["sweep_id"] == "s1"
+    assert record.provenance["preset"] == "vector"
+    assert "config_hash" in record.provenance
+
+
 def test_save_run_repeat_scores_are_means_with_std(tmp_path):
     _, record = _save(
         tmp_path, "r1", repeats=[[_result(1.0)], [_result(0.0)]]

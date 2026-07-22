@@ -104,6 +104,7 @@ def save_run(
     name: str | None = None,
     golden_hash: str | None = None,
     corpus_snapshot: dict | None = None,
+    extra_provenance: dict[str, str] | None = None,
 ) -> RunRecord:
     """Persist one eval run (run.json, config.yml, items.json, report.md)."""
     run_dir = runs_dir / run_id
@@ -125,6 +126,8 @@ def save_run(
         ),
     }
     provenance = {k: v for k, v in provenance.items() if v}
+    if extra_provenance:
+        provenance.update(extra_provenance)
 
     summary = config_summary(config)
     flat = [r for repeat in repeats for r in repeat]
