@@ -9,6 +9,7 @@ from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio import presets as presets_mod
 from rag_lab.studio.corpora import Corpus
 from rag_lab.studio.workspace import Workspace
 
@@ -71,6 +72,40 @@ def run_eval(
         corpus_snapshot=corpus.to_dict(),
         extra_provenance=extra_provenance,
     )
+
+
+def run_base_sweep(
+    workspace: Workspace,
+    corpus,
+    config: Config,
+    golden_path: Path,
+    sweep_id: str,
+    created_at: str,
+    *,
+    on_progress=None,
+    loader=None,
+    embedder=None,
+    llm=None,
+) -> list[RunRecord]:
+    """Run every base preset against the corpus as one tagged sweep."""
+    records: list[RunRecord] = []
+    for i, preset in enumerate(presets_mod.PRESETS):
+        if on_progress is not None:
+            on_progress(i, preset.name)
+        cfg = presets_mod.apply_preset(config, preset)
+        cfg.eval.deepeval = False
+        records.append(
+            run_eval(
+                workspace, corpus, cfg, golden_path,
+                run_id=f"{sweep_id}-{preset.name}",
+                created_at=created_at,
+                name=f"base: {preset.name}",
+                repeat=1,
+                loader=loader, embedder=embedder, llm=llm,
+                extra_provenance={"sweep_id": sweep_id, "preset": preset.name},
+            )
+        )
+    return records
 
 
 def list_runs(workspace: Workspace) -> list[RunRecord]:
