@@ -2279,6 +2279,7 @@ mcp = [
     { name = "mcp" },
 ]
 studio = [
+    { name = "altair" },
     { name = "streamlit" },
 ]
 
@@ -2289,6 +2290,7 @@ feedback = [
 
 [package.metadata]
 requires-dist = [
+    { name = "altair", marker = "extra == 'studio'", specifier = ">=5" },
     { name = "deepeval", marker = "extra == 'deepeval'", specifier = ">=2.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.2" },
@@ -2763,7 +2765,7 @@ wheels = [
 
 [[package]]
 name = "streamlit-testing-feedback"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "../streamlit-testing-feedback" }
 dependencies = [
     { name = "streamlit" },

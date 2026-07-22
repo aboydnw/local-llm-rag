@@ -479,7 +479,7 @@ def test_eval_set_baseline_pins_and_exits(tmp_path: Path, monkeypatch) -> None:
         ["eval", "--runs-dir", str(tmp_path / "runs"), "--set-baseline", run_id],
     )
     assert result.exit_code == 0
-    assert run_store.get_baseline(tmp_path / "runs") == run_id
+    assert run_store.get_baseline(tmp_path / "runs", str(db)) == run_id
 
 
 def test_eval_set_baseline_unknown_run_exits_1(tmp_path: Path) -> None:

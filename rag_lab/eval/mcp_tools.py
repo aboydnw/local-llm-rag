@@ -64,7 +64,7 @@ def run_eval(
         golden_hash=run_store.golden_hash(golden_path),
     )
     result = _record_summary(record)
-    baseline_id = run_store.get_baseline(runs_dir)
+    baseline_id = run_store.get_baseline(runs_dir, record.corpus)
     if baseline_id:
         baseline = run_store.load_run(runs_dir, baseline_id)
         shared = set(record.scores) & set(baseline.scores)
@@ -81,9 +81,9 @@ def run_eval(
 
 def list_runs(*, runs_dir: Path) -> list[dict]:
     """Run history, newest first, with the pinned baseline flagged."""
-    baseline_id = run_store.get_baseline(runs_dir)
     return [
-        _record_summary(r) | {"is_baseline": r.run_id == baseline_id}
+        _record_summary(r)
+        | {"is_baseline": r.run_id == run_store.get_baseline(runs_dir, r.corpus)}
         for r in run_store.list_runs(runs_dir)
     ]
 
@@ -101,7 +101,7 @@ def get_failures(run_id: str, *, runs_dir: Path) -> dict:
     gates = record.config.eval.gates
     if not gates:
         return {"run_id": run_id, "failures": [], "note": "no eval.gates configured"}
-    baseline_id = run_store.get_baseline(runs_dir)
+    baseline_id = run_store.get_baseline(runs_dir, record.corpus)
     reference = (
         run_store.load_run(runs_dir, baseline_id).scores
         if baseline_id and baseline_id != run_id

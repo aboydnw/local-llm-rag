@@ -104,6 +104,7 @@ def save_run(
     name: str | None = None,
     golden_hash: str | None = None,
     corpus_snapshot: dict | None = None,
+    extra_provenance: dict[str, str] | None = None,
 ) -> RunRecord:
     """Persist one eval run (run.json, config.yml, items.json, report.md)."""
     run_dir = runs_dir / run_id
@@ -125,6 +126,8 @@ def save_run(
         ),
     }
     provenance = {k: v for k, v in provenance.items() if v}
+    if extra_provenance:
+        provenance.update(extra_provenance)
 
     summary = config_summary(config)
     flat = [r for repeat in repeats for r in repeat]
@@ -165,6 +168,37 @@ def save_run(
         repeat=len(repeats),
         provenance=provenance,
     )
+
+
+def sweep_id(record: RunRecord) -> str | None:
+    """The sweep this run belongs to, or None for custom runs."""
+    return record.provenance.get("sweep_id")
+
+
+def latest_sweep_ids(records: list[RunRecord]) -> dict[str, str]:
+    """Newest sweep id per corpus, judged by created_at."""
+    latest: dict[str, tuple[str, str]] = {}
+    for record in records:
+        sid = sweep_id(record)
+        if sid is None:
+            continue
+        current = latest.get(record.corpus)
+        if current is None or record.created_at > current[0]:
+            latest[record.corpus] = (record.created_at, sid)
+    return {corpus: sid for corpus, (_, sid) in latest.items()}
+
+
+def visible_runs(
+    records: list[RunRecord], *, show_older_sweeps: bool = False
+) -> list[RunRecord]:
+    """Hide runs from superseded sweeps; custom runs are always visible."""
+    if show_older_sweeps:
+        return list(records)
+    latest = latest_sweep_ids(records)
+    return [
+        r for r in records
+        if sweep_id(r) is None or sweep_id(r) == latest.get(r.corpus)
+    ]
 
 
 def _record_from_json(data: dict) -> RunRecord:
@@ -222,24 +256,48 @@ def delete_run(runs_dir: Path, run_id: str) -> None:
         shutil.rmtree(run_path)
 
 
-def set_baseline(runs_dir: Path, run_id: str) -> None:
-    """Pin a run as the baseline every future run is compared against."""
-    if not (runs_dir / run_id / "run.json").exists():
-        raise ValueError(f"unknown run: {run_id}")
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    (runs_dir / BASELINE_FILE).write_text(json.dumps({"run_id": run_id}))
-
-
-def get_baseline(runs_dir: Path) -> str | None:
-    """The pinned baseline run id, or None if unset or pointing at a deleted run."""
-    pin = runs_dir / BASELINE_FILE
-    if not pin.exists():
+def _run_corpus(runs_dir: Path, run_id: str) -> str | None:
+    run_json = runs_dir / run_id / "run.json"
+    if not run_json.exists():
         return None
     try:
-        run_id = json.loads(pin.read_text())["run_id"]
-    except (ValueError, KeyError):
+        return json.loads(run_json.read_text()).get("corpus")
+    except ValueError:
         return None
-    if not (runs_dir / run_id / "run.json").exists():
+
+
+def _load_baselines(runs_dir: Path) -> dict[str, str]:
+    pin = runs_dir / BASELINE_FILE
+    if not pin.exists():
+        return {}
+    try:
+        data = json.loads(pin.read_text())
+    except ValueError:
+        return {}
+    if "baselines" in data:
+        return dict(data["baselines"])
+    run_id = data.get("run_id")
+    if not run_id:
+        return {}
+    corpus = _run_corpus(runs_dir, run_id)
+    return {corpus: run_id} if corpus else {}
+
+
+def set_baseline(runs_dir: Path, run_id: str) -> None:
+    """Pin a run as the baseline for its corpus."""
+    corpus = _run_corpus(runs_dir, run_id)
+    if corpus is None:
+        raise ValueError(f"unknown run: {run_id}")
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    baselines = _load_baselines(runs_dir)
+    baselines[corpus] = run_id
+    (runs_dir / BASELINE_FILE).write_text(json.dumps({"baselines": baselines}))
+
+
+def get_baseline(runs_dir: Path, corpus: str) -> str | None:
+    """The pinned baseline run id for a corpus, or None if unset or deleted."""
+    run_id = _load_baselines(runs_dir).get(corpus)
+    if run_id is None or not (runs_dir / run_id / "run.json").exists():
         return None
     return run_id
 

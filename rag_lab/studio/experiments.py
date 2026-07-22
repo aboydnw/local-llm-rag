@@ -9,6 +9,7 @@ from rag_lab.prompts import PromptBuilder
 from rag_lab.store.sqlite_vec import SqliteVecStore
 from rag_lab.studio import components
 from rag_lab.studio import indexer as indexer_mod
+from rag_lab.studio import presets as presets_mod
 from rag_lab.studio.corpora import Corpus
 from rag_lab.studio.workspace import Workspace
 
@@ -26,6 +27,7 @@ def run_eval(
     loader=None,
     embedder=None,
     llm=None,
+    extra_provenance: dict[str, str] | None = None,
 ) -> RunRecord:
     """Build (or reuse) the corpus index, run the golden set, and persist the run."""
     db_path = indexer_mod.ensure_index(
@@ -68,11 +70,55 @@ def run_eval(
         repeats=repeats,
         golden_hash=run_store.golden_hash(golden_path),
         corpus_snapshot=corpus.to_dict(),
+        extra_provenance=extra_provenance,
     )
+
+
+def run_base_sweep(
+    workspace: Workspace,
+    corpus,
+    config: Config,
+    golden_path: Path,
+    sweep_id: str,
+    created_at: str,
+    *,
+    on_progress=None,
+    loader=None,
+    embedder=None,
+    llm=None,
+) -> list[RunRecord]:
+    """Run every base preset against the corpus as one tagged sweep."""
+    records: list[RunRecord] = []
+    for i, preset in enumerate(presets_mod.PRESETS):
+        if on_progress is not None:
+            on_progress(i, preset.name)
+        cfg = presets_mod.apply_preset(config, preset)
+        cfg.eval.deepeval = False
+        records.append(
+            run_eval(
+                workspace, corpus, cfg, golden_path,
+                run_id=f"{sweep_id}-{preset.name}",
+                created_at=created_at,
+                name=f"base: {preset.name}",
+                repeat=1,
+                loader=loader, embedder=embedder, llm=llm,
+                extra_provenance={"sweep_id": sweep_id, "preset": preset.name},
+            )
+        )
+    return records
 
 
 def list_runs(workspace: Workspace) -> list[RunRecord]:
     return run_store.list_runs(workspace.runs_dir)
+
+
+def latest_sweep_records(workspace: Workspace, corpus: str) -> list[RunRecord]:
+    """Records of the newest sweep for a corpus, or [] when never swept."""
+    records = [r for r in list_runs(workspace) if r.corpus == corpus]
+    sid = run_store.latest_sweep_ids(records).get(corpus)
+    if sid is None:
+        return []
+    return [r for r in records if r.provenance.get("sweep_id") == sid]
 
 
 def load_run(workspace: Workspace, run_id: str) -> RunRecord:
@@ -95,8 +141,8 @@ def set_baseline(workspace: Workspace, run_id: str) -> None:
     run_store.set_baseline(workspace.runs_dir, run_id)
 
 
-def get_baseline(workspace: Workspace) -> str | None:
-    return run_store.get_baseline(workspace.runs_dir)
+def get_baseline(workspace: Workspace, corpus: str) -> str | None:
+    return run_store.get_baseline(workspace.runs_dir, corpus)
 
 
 def diff(run_a: RunRecord, run_b: RunRecord) -> dict:

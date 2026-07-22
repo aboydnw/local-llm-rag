@@ -48,6 +48,21 @@ def test_save_run_records_provenance(tmp_path):
     assert data["provenance"]["config_hash"] == run_store.config_hash(Config())
 
 
+def test_save_run_merges_extra_provenance(tmp_path):
+    record = run_store.save_run(
+        tmp_path / "runs",
+        run_id="r-sweep",
+        created_at="2026-07-22T00:00:00+00:00",
+        corpus="docs/",
+        config=Config(),
+        repeats=[[_result()]],
+        extra_provenance={"sweep_id": "s1", "preset": "vector"},
+    )
+    assert record.provenance["sweep_id"] == "s1"
+    assert record.provenance["preset"] == "vector"
+    assert "config_hash" in record.provenance
+
+
 def test_save_run_repeat_scores_are_means_with_std(tmp_path):
     _, record = _save(
         tmp_path, "r1", repeats=[[_result(1.0)], [_result(0.0)]]
@@ -101,9 +116,9 @@ def test_diff_reports_changed_knobs_and_deltas(tmp_path):
 
 def test_baseline_pin_set_get(tmp_path):
     runs_dir, _ = _save(tmp_path, "r1")
-    assert run_store.get_baseline(runs_dir) is None
+    assert run_store.get_baseline(runs_dir, "docs/") is None
     run_store.set_baseline(runs_dir, "r1")
-    assert run_store.get_baseline(runs_dir) == "r1"
+    assert run_store.get_baseline(runs_dir, "docs/") == "r1"
 
 
 def test_set_baseline_rejects_unknown_run(tmp_path):
@@ -116,7 +131,56 @@ def test_get_baseline_none_when_pinned_run_deleted(tmp_path):
     runs_dir, _ = _save(tmp_path, "r1")
     run_store.set_baseline(runs_dir, "r1")
     run_store.delete_run(runs_dir, "r1")
-    assert run_store.get_baseline(runs_dir) is None
+    assert run_store.get_baseline(runs_dir, "docs/") is None
+
+
+def test_baseline_is_per_corpus(tmp_path):
+    runs_dir = tmp_path / "runs"
+    for rid, corpus in [("r1", "c1"), ("r2", "c2")]:
+        run_store.save_run(runs_dir, run_id=rid, created_at="t", corpus=corpus,
+                           config=Config(), repeats=[[_result()]])
+    run_store.set_baseline(runs_dir, "r1")
+    run_store.set_baseline(runs_dir, "r2")
+    assert run_store.get_baseline(runs_dir, "c1") == "r1"
+    assert run_store.get_baseline(runs_dir, "c2") == "r2"
+    assert run_store.get_baseline(runs_dir, "c3") is None
+
+
+def test_legacy_single_pin_migrates_to_its_corpus(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_store.save_run(runs_dir, run_id="r1", created_at="t", corpus="c1",
+                       config=Config(), repeats=[[_result()]])
+    (runs_dir / run_store.BASELINE_FILE).write_text('{"run_id": "r1"}')
+    assert run_store.get_baseline(runs_dir, "c1") == "r1"
+    assert run_store.get_baseline(runs_dir, "c2") is None
+
+
+def _rec(run_id, corpus, created_at, sweep=None):
+    prov = {"sweep_id": sweep} if sweep else {}
+    return run_store.RunRecord(
+        run_id=run_id, name=run_id, created_at=created_at,
+        corpus=corpus, scores={}, config=Config(), provenance=prov,
+    )
+
+
+def test_latest_sweep_ids_picks_newest_per_corpus():
+    records = [
+        _rec("a", "c1", "2026-07-20T00:00:00", sweep="old"),
+        _rec("b", "c1", "2026-07-22T00:00:00", sweep="new"),
+        _rec("c", "c2", "2026-07-21T00:00:00", sweep="other"),
+    ]
+    assert run_store.latest_sweep_ids(records) == {"c1": "new", "c2": "other"}
+
+
+def test_visible_runs_hides_superseded_sweeps_keeps_custom():
+    records = [
+        _rec("a", "c1", "2026-07-20T00:00:00", sweep="old"),
+        _rec("b", "c1", "2026-07-22T00:00:00", sweep="new"),
+        _rec("custom", "c1", "2026-07-19T00:00:00"),
+    ]
+    visible = run_store.visible_runs(records)
+    assert {r.run_id for r in visible} == {"b", "custom"}
+    assert len(run_store.visible_runs(records, show_older_sweeps=True)) == 3
 
 
 def test_config_hash_stable_and_sensitive(tmp_path):

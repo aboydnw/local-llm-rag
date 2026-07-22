@@ -23,7 +23,7 @@ def _seed_run(tmp_path, run_id, recall=1.0, gates=None) -> Path:
         runs_dir,
         run_id=run_id,
         created_at=f"2026-07-21T00:00:0{run_id[-1]}+00:00",
-        corpus="rag.db",
+        corpus=str(tmp_path / "rag.db"),
         config=config,
         repeats=[[_result(recall)]],
     )
