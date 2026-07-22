@@ -24,6 +24,12 @@ def _sweep_section(ws, corpus, cfg, golden) -> None:
         "Runs all 8 base presets on the existing index. Every question is answered "
         "by the local LLM, so expect roughly 10–20+ minutes."
     )
+    st.warning(
+        "The sweep runs in this browser tab. Switching pages or closing the tab "
+        "before it finishes cancels the run — nothing is saved. Keep this tab open "
+        "until it completes.",
+        icon="⚠️",
+    )
     if st.button("Run base set (8 presets)", type="primary"):
         progress = st.progress(0.0, text="Starting sweep…")
         try:
@@ -115,6 +121,7 @@ def render() -> None:
     else:
         st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
+    st.caption("Runs in this tab — leaving the page before it finishes cancels the run.")
     if st.button("Run eval", type="primary"):
         st.session_state["evaluate_config_acted"] = True
         if not golden.exists():
