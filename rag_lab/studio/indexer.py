@@ -45,7 +45,10 @@ def delete_indexes_for_corpus(workspace: Workspace, corpus: Corpus) -> int:
             metadata = json.loads(metadata_path.read_text())
         except (OSError, ValueError):
             continue
-        if metadata.get("corpus", {}).get("name") != corpus.name:
+        if not isinstance(metadata, dict):
+            continue
+        corpus_metadata = metadata.get("corpus")
+        if not isinstance(corpus_metadata, dict) or corpus_metadata.get("name") != corpus.name:
             continue
         for artifact in workspace.indexes_dir.glob(f"{metadata_path.stem}.*"):
             artifact.unlink(missing_ok=True)

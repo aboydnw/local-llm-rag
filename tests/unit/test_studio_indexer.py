@@ -180,11 +180,18 @@ def test_delete_indexes_for_corpus_removes_all_variants_only(tmp_path):
         (ws.indexes_dir / f"{key}.db-wal").write_text("wal")
     ws.index_meta("other").write_text('{"corpus": {"name": "other"}}')
     ws.index_db("other").write_text("database")
-    ws.index_meta("broken").write_text("not-json")
+    malformed = {
+        "broken": "not-json",
+        "array": "[]",
+        "string": '"text"',
+        "null-corpus": '{"corpus": null}',
+    }
+    for key, payload in malformed.items():
+        ws.index_meta(key).write_text(payload)
 
     assert indexer.delete_indexes_for_corpus(ws, corpus) == 2
     assert not list(ws.indexes_dir.glob("variant-a.*"))
     assert not list(ws.indexes_dir.glob("variant-b.*"))
     assert ws.index_meta("other").exists()
     assert ws.index_db("other").exists()
-    assert ws.index_meta("broken").exists()
+    assert all(ws.index_meta(key).exists() for key in malformed)
