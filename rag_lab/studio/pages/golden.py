@@ -7,6 +7,7 @@ from rag_lab.studio import golden_io
 
 
 def render() -> None:
+    """Render the evaluation-set viewer and question editor."""
     st.title("Test questions")
     st.caption("Define the questions and evidence used to measure every evaluation run.")
     with st.expander("Evaluation set file", expanded=False):
@@ -72,7 +73,11 @@ def render() -> None:
             golden_io.save_items(path, updated)
             st.toast(f"Saved {normalized_id}")
             st.rerun()
-    confirmed = remove.checkbox("Confirm delete", disabled=existing is None)
+    confirmed = remove.checkbox(
+        "Confirm delete",
+        disabled=existing is None,
+        key=f"confirm-delete-{existing.id}" if existing else "confirm-delete-new",
+    )
     if remove.button("Delete question", disabled=existing is None or not confirmed):
         golden_io.save_items(path, golden_io.delete_item(items, existing.id))
         st.rerun()

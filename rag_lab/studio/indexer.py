@@ -37,6 +37,22 @@ def cache_key(corpus: Corpus, config: Config) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
+def delete_indexes_for_corpus(workspace: Workspace, corpus: Corpus) -> int:
+    """Delete every cached index variant whose metadata names ``corpus``."""
+    deleted = 0
+    for metadata_path in workspace.indexes_dir.glob("*.json"):
+        try:
+            metadata = json.loads(metadata_path.read_text())
+        except (OSError, ValueError):
+            continue
+        if metadata.get("corpus", {}).get("name") != corpus.name:
+            continue
+        for artifact in workspace.indexes_dir.glob(f"{metadata_path.stem}.*"):
+            artifact.unlink(missing_ok=True)
+        deleted += 1
+    return deleted
+
+
 def status(workspace: Workspace, corpus: Corpus, config: Config) -> IndexStatus:
     key = cache_key(corpus, config)
     cached = workspace.index_db(key).exists()

@@ -16,10 +16,13 @@ ITEM_METRICS = (
 
 
 def _ago(created_at: str) -> str:
+    """Format a stored ISO timestamp as a defensive relative time."""
     try:
         then = datetime.fromisoformat(created_at)
     except ValueError:
         return created_at
+    if then.tzinfo is None:
+        then = then.replace(tzinfo=UTC)
     delta = datetime.now(UTC) - then
     if delta.days:
         return f"{delta.days}d ago"
@@ -28,11 +31,13 @@ def _ago(created_at: str) -> str:
 
 
 def _run_label(record, baseline_id: str | None) -> str:
+    """Build a run selector label with baseline and age context."""
     marker = "★ " if record.run_id == baseline_id else ""
     return f"{marker}{record.name} · {_ago(record.created_at)}"
 
 
 def _score_summary(record, baseline) -> None:
+    """Render core score cards and baseline deltas."""
     cols = st.columns(min(4, len(record.scores)))
     for col, metric in zip(cols, charts.CORE_METRICS, strict=False):
         if metric not in record.scores:
@@ -48,6 +53,7 @@ def _score_summary(record, baseline) -> None:
 
 
 def _overview(ws, record, runs, baseline) -> None:
+    """Render the selected report overview and score history."""
     _score_summary(record, baseline)
     if baseline and baseline.run_id != record.run_id:
         failures = gate_failures(record.scores, baseline.scores, record.config.eval.gates)
@@ -78,6 +84,7 @@ def _overview(ws, record, runs, baseline) -> None:
 
 
 def _compare(record, runs) -> None:
+    """Render a two-run metric and configuration comparison."""
     alternatives = [r for r in runs if r.run_id != record.run_id]
     if not alternatives:
         st.info("Run another evaluation to compare results.")
@@ -96,6 +103,7 @@ def _compare(record, runs) -> None:
 
 
 def _question_rows(items: list[dict], baseline_items: list[dict]) -> list[dict]:
+    """Build question rows sorted by worst baseline regression first."""
     baseline_by_key = {
         (item.get("item_id"), item.get("repeat", 0)): item for item in baseline_items
     }
@@ -121,6 +129,7 @@ def _question_rows(items: list[dict], baseline_items: list[dict]) -> list[dict]:
 
 
 def _questions(ws, record, baseline) -> None:
+    """Render question-level regressions and selected-item evidence."""
     items = experiments.load_run_items(ws, record.run_id)
     if not items:
         st.info("No question-level artifacts were captured for this run.")
@@ -180,6 +189,7 @@ def _questions(ws, record, baseline) -> None:
 
 
 def _settings_and_report(ws, record) -> None:
+    """Render persisted configuration and the raw Markdown report."""
     st.code(config_summary(record.config), language="text")
     report = ws.run_dir(record.run_id) / "report.md"
     if report.exists():
@@ -187,6 +197,7 @@ def _settings_and_report(ws, record) -> None:
 
 
 def _manage(ws, record, baseline_id) -> None:
+    """Render rename, baseline, and confirmed deletion controls."""
     name = st.text_input("Run name", value=record.name)
     if st.button("Save name") and name.strip() and name.strip() != record.name:
         experiments.rename_run(ws, record.run_id, name.strip())
@@ -203,6 +214,7 @@ def _manage(ws, record, baseline_id) -> None:
 
 
 def render() -> None:
+    """Render the report selector and persistent report-detail workspace."""
     st.title("Evaluation reports")
     st.caption("Track progress, compare configurations, and find the questions that regressed.")
     ws = Workspace.default()
@@ -226,6 +238,7 @@ def render() -> None:
     current = st.session_state.get("selected_report_run")
     if current not in labels:
         current = runs[0].run_id
+        st.session_state["selected_report_run"] = current
     run_id = st.selectbox(
         "Report",
         list(labels),

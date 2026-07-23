@@ -8,6 +8,7 @@ from rag_lab.studio.workspace import Workspace
 
 
 def _source_label(source: Source) -> str:
+    """Return a concise source description for the corpus list."""
     if source.type == "github":
         return f"GitHub repository · {source.repo}" + (" · private" if source.private else "")
     if source.type == "github_issue":
@@ -16,6 +17,7 @@ def _source_label(source: Source) -> str:
 
 
 def _add_source(corpus: Corpus) -> Source | None:
+    """Render the source form and return a validated source on submission."""
     source_type = st.selectbox("Source type", ["GitHub repository", "GitHub issue", "Local folder"])
     if source_type == "GitHub repository":
         value = st.text_input("Repository", placeholder="developmentseed/titiler")
@@ -44,6 +46,7 @@ def _add_source(corpus: Corpus) -> Source | None:
 
 
 def render() -> None:
+    """Render corpus source management, indexing, and deletion."""
     st.title("Corpus")
     st.caption("Choose what the system can search, then build its local index.")
     cfg = st.session_state["config"]
@@ -118,6 +121,7 @@ def render() -> None:
         )
         confirmed = st.checkbox(f"I understand this deletes {choice}")
         if st.button("Delete corpus", disabled=not confirmed):
+            indexer_mod.delete_indexes_for_corpus(ws, corpus)
             corpora_mod.delete_corpus(ws, choice)
             if st.session_state.get("corpus_name") == choice:
                 st.session_state["corpus_name"] = None
