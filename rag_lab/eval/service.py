@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from rag_lab import pipeline
-from rag_lab.config import Config
+from rag_lab.config import Config, eval_judge
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval.runner import EvalResult, EvalRunner
 
@@ -18,12 +18,9 @@ def build_runner(cfg: Config, db: Path, *, use_agent: bool = False) -> EvalRunne
     if cfg.eval.deepeval:
         from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
 
-        scorer = DeepEvalScorer(model=cfg.eval.deepeval_model or cfg.llm.model)
-    agent = (
-        pipeline.build_agent(store, embedder, cfg)
-        if (use_agent or cfg.agent.enabled)
-        else None
-    )
+        judge_provider, judge_model = eval_judge(cfg)
+        scorer = DeepEvalScorer(model=judge_model, provider=judge_provider)
+    agent = pipeline.build_agent(store, embedder, cfg) if (use_agent or cfg.agent.enabled) else None
     return EvalRunner(
         retriever=retriever,
         llm=llm,

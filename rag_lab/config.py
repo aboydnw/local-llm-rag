@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from rag_lab.agent.agent import DEFAULT_AGENT_INSTRUCTIONS
 from rag_lab.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
@@ -23,7 +23,9 @@ class EmbedderConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
-    type: Literal["ollama"] = "ollama"
+    provider: Literal["ollama", "gemini"] = Field(
+        default="ollama", validation_alias=AliasChoices("provider", "type")
+    )
     model: str = "llama3.2:3b"
     think: bool | None = None
     """Thinking-mode toggle for reasoning models (e.g. Qwen3). None leaves the
@@ -41,6 +43,7 @@ class RetrieverConfig(BaseModel):
 
 class EvalConfig(BaseModel):
     deepeval: bool = False
+    judge_provider: Literal["ollama", "gemini"] | None = None
     deepeval_model: str | None = None
     abstention_markers: list[str] = Field(
         default_factory=lambda: [
@@ -55,9 +58,7 @@ class EvalConfig(BaseModel):
 
     @field_validator("gates")
     @classmethod
-    def _gate_thresholds_non_negative_and_finite(
-        cls, value: dict[str, float]
-    ) -> dict[str, float]:
+    def _gate_thresholds_non_negative_and_finite(cls, value: dict[str, float]) -> dict[str, float]:
         for metric, max_drop in value.items():
             if not math.isfinite(max_drop) or max_drop < 0:
                 raise ValueError(
@@ -90,7 +91,7 @@ class AgentConfig(BaseModel):
             "keyword_search",
             "list_documents",
             "fetch_document",
-        ]
+        ],
     )
 
 
@@ -110,6 +111,21 @@ EMBEDDING_DIMENSIONS: dict[str, int] = {
     "all-minilm": 384,
 }
 
+DEFAULT_LLM_MODELS: dict[str, str] = {
+    "ollama": "llama3.2:3b",
+    "gemini": "gemini-2.5-flash-lite",
+}
+
+
+def eval_judge(config: Config) -> tuple[str, str]:
+    """Resolve the evaluation provider/model, including cross-provider defaults."""
+    provider = config.eval.judge_provider or config.llm.provider
+    if config.eval.deepeval_model:
+        return provider, config.eval.deepeval_model
+    if provider == config.llm.provider:
+        return provider, config.llm.model
+    return provider, DEFAULT_LLM_MODELS[provider]
+
 
 def embedding_dimension(model: str) -> int:
     """Return the vector dimension for a known Ollama embedding model."""
@@ -125,7 +141,7 @@ def config_summary(config: Config) -> str:
     summary = (
         f"chunker={config.chunker.type}@{config.chunker.max_tokens} "
         f"retriever={r.type}(v={r.vector_weight},b={r.bm25_weight}) "
-        f"llm={config.llm.model} embedder={config.embedder.model}"
+        f"llm={config.llm.provider}/{config.llm.model} embedder={config.embedder.model}"
     )
     if config.agent.enabled:
         a = config.agent
@@ -143,7 +159,7 @@ embedder:
   type: ollama
   model: nomic-embed-text
 llm:
-  type: ollama
+  provider: ollama
   model: llama3.2:3b
 retriever:
   type: hybrid

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rag_lab.config import Config
+from rag_lab.config import Config, eval_judge
 from rag_lab.eval import golden_set as golden_set_mod
 from rag_lab.eval import run_store
 from rag_lab.eval.run_store import RunRecord
@@ -30,9 +30,7 @@ def run_eval(
     extra_provenance: dict[str, str] | None = None,
 ) -> RunRecord:
     """Build (or reuse) the corpus index, run the golden set, and persist the run."""
-    db_path = indexer_mod.ensure_index(
-        workspace, corpus, config, loader=loader, embedder=embedder
-    )
+    db_path = indexer_mod.ensure_index(workspace, corpus, config, loader=loader, embedder=embedder)
     if embedder is None:
         embedder = components.build_embedder(config)
     store = SqliteVecStore(db_path, dimension=embedder.dimension)
@@ -47,7 +45,8 @@ def run_eval(
     if config.eval.deepeval:
         from rag_lab.eval.scorers.deepeval_scorer import DeepEvalScorer
 
-        scorer = DeepEvalScorer(model=config.eval.deepeval_model or config.llm.model)
+        judge_provider, judge_model = eval_judge(config)
+        scorer = DeepEvalScorer(model=judge_model, provider=judge_provider)
     runner = EvalRunner(
         retriever=retriever,
         llm=llm,
@@ -96,12 +95,17 @@ def run_base_sweep(
         cfg.eval.deepeval = False
         records.append(
             run_eval(
-                workspace, corpus, cfg, golden_path,
+                workspace,
+                corpus,
+                cfg,
+                golden_path,
                 run_id=f"{sweep_id}-{preset.name}",
                 created_at=created_at,
                 name=f"base: {preset.name}",
                 repeat=1,
-                loader=loader, embedder=embedder, llm=llm,
+                loader=loader,
+                embedder=embedder,
+                llm=llm,
                 extra_provenance={"sweep_id": sweep_id, "preset": preset.name},
             )
         )

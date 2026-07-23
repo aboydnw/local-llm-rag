@@ -7,12 +7,30 @@ logger = logging.getLogger(__name__)
 
 
 class DeepEvalScorer:
-    """Scores answers with DeepEval metrics backed by a local Ollama model."""
+    """Scores answers with DeepEval metrics backed by the selected provider."""
 
-    def __init__(self, model: str) -> None:
-        from deepeval.models import OllamaModel
+    def __init__(self, model: str, provider: str = "ollama") -> None:
+        if provider == "ollama":
+            from deepeval.models import OllamaModel
 
-        self._model = OllamaModel(model=model)
+            self._model = OllamaModel(model=model)
+        elif provider == "gemini":
+            import os
+
+            from deepeval.models import GeminiModel
+
+            from rag_lab.llms.gemini import _load_local_env
+
+            _load_local_env()
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "GEMINI_API_KEY is not set. Copy .env-local-example to .env-local "
+                    "and add your key."
+                )
+            self._model = GeminiModel(model=model, api_key=api_key, temperature=0)
+        else:
+            raise ValueError(f"Unknown judge provider: {provider}")
 
     def score(
         self,

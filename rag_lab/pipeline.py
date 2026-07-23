@@ -15,6 +15,8 @@ from rag_lab.chunkers.recursive import RecursiveChunker
 from rag_lab.chunkers.semantic import SemanticChunker
 from rag_lab.config import Config, embedding_dimension
 from rag_lab.embedders.ollama import OllamaEmbedder, prefixes_for_model
+from rag_lab.llms.base import LLM
+from rag_lab.llms.gemini import GeminiLLM
 from rag_lab.llms.ollama import OllamaLLM
 from rag_lab.prompts import PromptBuilder
 from rag_lab.rerankers.llm import LLMReranker
@@ -71,8 +73,12 @@ def build_chunker(config: Config, embedder=None) -> Chunker:
     raise ValueError(f"Unknown chunker type: {chunker.type}")
 
 
-def build_llm(config: Config) -> OllamaLLM:
-    return OllamaLLM(model=config.llm.model, think=config.llm.think)
+def build_llm(config: Config) -> LLM:
+    if config.llm.provider == "ollama":
+        return OllamaLLM(model=config.llm.model, think=config.llm.think)
+    if config.llm.provider == "gemini":
+        return GeminiLLM(model=config.llm.model)
+    raise ValueError(f"Unknown LLM provider: {config.llm.provider}")
 
 
 def build_store(config: Config, db: Path) -> SqliteVecStore:

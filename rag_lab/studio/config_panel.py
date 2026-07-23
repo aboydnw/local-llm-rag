@@ -151,22 +151,45 @@ def _render_agent_knobs(cfg: Config) -> None:
 
 def _render_models(cfg: Config, installed: list[str], ollama_error: str | None) -> None:
     st.subheader("LLM")
-    if ollama_error is not None:
-        st.info("Ollama not reachable — is it running?")
-    llm_options = config_logic.llm_model_options(installed, cfg.llm.model)
-    llm_choice = st.selectbox(
-        "LLM model",
-        llm_options,
-        index=llm_options.index(cfg.llm.model),
-        help="Ollama model that writes the final answer. Cheap to change — no rebuild needed.",
+    providers = ["ollama", "gemini"]
+    cfg.llm.provider = st.selectbox(
+        "Provider",
+        providers,
+        index=providers.index(cfg.llm.provider),
+        help="Ollama stays local; Gemini sends prompts and retrieved passages to Google.",
     )
-    if llm_choice == config_logic.PULL_SENTINEL:
-        name = st.text_input("Model name to pull", key="llm_pull_name", placeholder="llama3.2:3b")
-        if st.button("Pull", key="llm_pull_btn") and name.strip():
-            pull_ui.run_pull(name.strip())
-            cfg.llm.model = name.strip()
+    if cfg.llm.provider == "ollama":
+        if ollama_error is not None:
+            st.info("Ollama not reachable — is it running?")
+        if cfg.llm.model.startswith("gemini-"):
+            cfg.llm.model = installed[0] if installed else "llama3.2:3b"
+        llm_options = config_logic.llm_model_options(installed, cfg.llm.model)
+        llm_choice = st.selectbox(
+            "LLM model",
+            llm_options,
+            index=llm_options.index(cfg.llm.model),
+            help="Local Ollama model that writes the final answer.",
+        )
+        if llm_choice == config_logic.PULL_SENTINEL:
+            name = st.text_input(
+                "Model name to pull", key="llm_pull_name", placeholder="llama3.2:3b"
+            )
+            if st.button("Pull", key="llm_pull_btn") and name.strip():
+                pull_ui.run_pull(name.strip())
+                cfg.llm.model = name.strip()
+        else:
+            cfg.llm.model = llm_choice
     else:
-        cfg.llm.model = llm_choice
+        if not cfg.llm.model.startswith("gemini-"):
+            cfg.llm.model = "gemini-2.5-flash-lite"
+        cfg.llm.model = (
+            st.text_input(
+                "Gemini model",
+                value=cfg.llm.model,
+                help="Use gemini-2.5-flash-lite for low cost or gemini-2.5-flash for quality.",
+            ).strip()
+            or "gemini-2.5-flash-lite"
+        )
 
 
 def _render_prompt(cfg: Config) -> None:

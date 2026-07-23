@@ -4,6 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from rag_lab.config import eval_judge
 from rag_lab.studio import config_panel, experiments, feedback
 from rag_lab.studio import corpora as corpora_mod
 from rag_lab.studio import indexer as indexer_mod
@@ -21,7 +22,7 @@ def _sweep_section(ws, corpus, cfg, golden) -> None:
         )
     st.caption(
         "Runs all 8 base presets on the existing index. Every question is answered "
-        "by the local LLM, so expect roughly 10–20+ minutes."
+        "by the configured LLM; hosted providers are usually much faster than local models."
     )
     st.warning(
         "The sweep runs in this browser tab. Switching pages or closing the tab "
@@ -108,19 +109,27 @@ def render() -> None:
         "DeepEval scoring",
         value=cfg.eval.deepeval,
         help="Adds LLM-judged answer-quality metrics (relevancy, faithfulness) on top of the "
-        "always-on retrieval + keyword metrics. Slower — each metric is an extra Ollama call "
-        f"({cfg.llm.model}) per question.",
+        "always-on retrieval + keyword metrics. Each metric is an extra model call "
+        f"({cfg.llm.provider}/{cfg.llm.model}) per question.",
     )
     if cfg.eval.deepeval:
+        providers = ["ollama", "gemini"]
+        current_provider = cfg.eval.judge_provider or cfg.llm.provider
+        cfg.eval.judge_provider = st.selectbox(
+            "Judge provider",
+            providers,
+            index=providers.index(current_provider),
+            help="The judge can use a different provider from the answer model.",
+        )
         judge = st.text_input(
             "Judge model",
             value=cfg.eval.deepeval_model or "",
             placeholder=cfg.llm.model,
-            help="Ollama model that scores the answers. Leave blank to reuse the answer LLM; "
-            "set a stronger model here so the judge isn't grading its own homework.",
+            help="Leave blank to reuse the answer model name, or choose a stronger judge.",
         ).strip()
         cfg.eval.deepeval_model = judge or None
-        st.caption(f"LLM-judged metrics on, scored by {cfg.eval.deepeval_model or cfg.llm.model}.")
+        _, effective_model = eval_judge(cfg)
+        st.caption(f"LLM-judged metrics on: {cfg.eval.judge_provider}/{effective_model}.")
     else:
         st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
