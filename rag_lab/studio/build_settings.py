@@ -17,7 +17,9 @@ def render(cfg: Config) -> None:
     st.subheader("Chunker  🟠 re-index")
     chunker_types = ["markdown_aware", "fixed", "recursive", "semantic"]
     cfg.chunker.type = st.selectbox(
-        "type", chunker_types, index=chunker_types.index(cfg.chunker.type),
+        "Chunking method",
+        chunker_types,
+        index=chunker_types.index(cfg.chunker.type),
         help="How documents are split. 'markdown_aware' splits on headings; "
         "'fixed' splits on a flat token count; 'recursive' splits on "
         "paragraphs then sentences then tokens; 'semantic' splits where "
@@ -25,19 +27,31 @@ def render(cfg: Config) -> None:
     )
     max_tokens_default = min(2048, max(64, cfg.chunker.max_tokens))
     cfg.chunker.max_tokens = st.slider(
-        "max_tokens", 64, 2048, max_tokens_default, 32,
+        "Maximum chunk size",
+        64,
+        2048,
+        max_tokens_default,
+        32,
         help="Largest chunk size, in tokens.",
     )
     overlap_ceiling = max(0, cfg.chunker.max_tokens - 1)
     overlap_default = min(256, overlap_ceiling, max(0, cfg.chunker.overlap))
     cfg.chunker.overlap = st.slider(
-        "overlap", 0, min(256, overlap_ceiling), overlap_default, 8,
+        "Chunk overlap",
+        0,
+        min(256, overlap_ceiling),
+        overlap_default,
+        8,
         help="Tokens repeated between adjacent chunks so ideas spanning a boundary aren't lost. "
         "Capped below max_tokens.",
     )
     if cfg.chunker.type == "semantic":
         cfg.chunker.similarity_threshold = st.slider(
-            "similarity_threshold", 0.0, 1.0, cfg.chunker.similarity_threshold, 0.05,
+            "similarity_threshold",
+            0.0,
+            1.0,
+            cfg.chunker.similarity_threshold,
+            0.05,
             help="Higher = more, smaller chunks; lower = fewer, larger chunks. "
             "Only used by the 'semantic' chunker.",
         )
@@ -52,7 +66,9 @@ def render(cfg: Config) -> None:
         labels = {**labels, cfg.embedder.model: f"{cfg.embedder.model} (unknown dimension)"}
     embed_index = embed_models.index(cfg.embedder.model)
     cfg.embedder.model = st.selectbox(
-        "embedding model", embed_models, index=embed_index,
+        "Embedding model",
+        embed_models,
+        index=embed_index,
         format_func=lambda m: labels[m],
         help="Ollama model that turns text into vectors. Changing it requires a rebuild.",
     )

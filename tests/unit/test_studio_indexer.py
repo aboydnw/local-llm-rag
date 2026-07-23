@@ -99,8 +99,11 @@ def test_build_index_creates_populated_db(tmp_path):
     corpus_dir = _corpus(tmp_path)
     c = local_corpus(str(corpus_dir))
     db = indexer.build_index(
-        ws, c, Config(),
-        loader=MarkdownLoader(corpus_dir), embedder=FakeEmbedder(16),
+        ws,
+        c,
+        Config(),
+        loader=MarkdownLoader(corpus_dir),
+        embedder=FakeEmbedder(16),
     )
     assert db.exists()
     assert SqliteVecStore(db, dimension=16).count() > 0
@@ -113,8 +116,11 @@ def test_ensure_index_reuses_cache(tmp_path, monkeypatch):
     corpus_dir = _corpus(tmp_path)
     c = local_corpus(str(corpus_dir))
     indexer.build_index(
-        ws, c, Config(),
-        loader=MarkdownLoader(corpus_dir), embedder=FakeEmbedder(16),
+        ws,
+        c,
+        Config(),
+        loader=MarkdownLoader(corpus_dir),
+        embedder=FakeEmbedder(16),
     )
 
     def _boom(*args, **kwargs):
@@ -162,3 +168,30 @@ def test_loader_for_corpus_builds_issue_loader(tmp_path):
     inner = loader.loaders[0]
     assert inner.repo == "o/r"
     assert inner.numbers == [7]
+
+
+def test_delete_indexes_for_corpus_removes_all_variants_only(tmp_path):
+    ws = Workspace(tmp_path / ".rag-lab")
+    ws.initialize()
+    corpus = Corpus(name="kb", sources=(Source(type="github", repo="o/a"),))
+    for key in ("variant-a", "variant-b"):
+        ws.index_meta(key).write_text('{"corpus": {"name": "kb"}}')
+        ws.index_db(key).write_text("database")
+        (ws.indexes_dir / f"{key}.db-wal").write_text("wal")
+    ws.index_meta("other").write_text('{"corpus": {"name": "other"}}')
+    ws.index_db("other").write_text("database")
+    malformed = {
+        "broken": "not-json",
+        "array": "[]",
+        "string": '"text"',
+        "null-corpus": '{"corpus": null}',
+    }
+    for key, payload in malformed.items():
+        ws.index_meta(key).write_text(payload)
+
+    assert indexer.delete_indexes_for_corpus(ws, corpus) == 2
+    assert not list(ws.indexes_dir.glob("variant-a.*"))
+    assert not list(ws.indexes_dir.glob("variant-b.*"))
+    assert ws.index_meta("other").exists()
+    assert ws.index_db("other").exists()
+    assert all(ws.index_meta(key).exists() for key in malformed)

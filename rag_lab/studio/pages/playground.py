@@ -12,7 +12,8 @@ from rag_lab.studio.workspace import Workspace
 
 def render() -> None:
     """Render the Ask playground: retrieve chunks and generate an answer for a question."""
-    st.title("Ask playground")
+    st.title("Playground")
+    st.caption("Try one question with the active corpus and experiment settings.")
     cfg = config_panel.render(st.session_state, "playground")
     question = st.text_input("Question", placeholder="What is titiler?")
     if question.strip():
@@ -54,9 +55,9 @@ def render() -> None:
             retriever = components.build_retriever(store, embedder, cfg)
             with feedback.instrument("retrieval", question=question, k=cfg.retriever.k):
                 results = retriever.retrieve(question, k=cfg.retriever.k)
-            prompt = PromptBuilder(
-                system_instructions=cfg.prompt.system_instructions
-            ).build(question=question, results=results)
+            prompt = PromptBuilder(system_instructions=cfg.prompt.system_instructions).build(
+                question=question, results=results
+            )
         except Exception as exc:  # noqa: BLE001
             st.error(f"Retrieval failed: {exc}")
             return
@@ -100,9 +101,7 @@ def _render_agent_run(store, embedder, cfg, question: str) -> None:
         f"{result.llm_calls} LLM calls · {tool_calls} tool calls · "
         f"{len(result.chunks_seen)} chunks seen → {len(result.final_context)} used"
     )
-    trace_view.render_steps(
-        [trace_dict(s) for s in result.steps], key_prefix="playground"
-    )
+    trace_view.render_steps([trace_dict(s) for s in result.steps], key_prefix="playground")
 
     st.subheader("Answer")
     st.write(result.answer)

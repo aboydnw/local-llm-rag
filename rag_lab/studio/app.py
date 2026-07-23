@@ -22,10 +22,8 @@ def _load_config() -> Config:
 
 def main() -> None:
     """Initialize session state, render the sidebar, and route the studio pages."""
-    st.set_page_config(page_title="rag-lab studio", layout="wide")
-    ui_state.init_state(
-        st.session_state, _load_config(), ".", "examples/devseed-oss/golden.yml"
-    )
+    st.set_page_config(page_title="rag-lab studio", page_icon="🧪", layout="wide")
+    ui_state.init_state(st.session_state, _load_config(), ".", "examples/devseed-oss/golden.yml")
     ws = Workspace.default()
     ws.initialize()
     corpora_mod.ensure_default_corpus(ws)
@@ -39,14 +37,23 @@ def main() -> None:
         if zip_path:
             st.sidebar.success(f"feedback saved: {zip_path.name}")
 
-    pages = st.navigation([
-        st.Page(playground.render, title="Ask playground", icon="💬",
-                url_path="playground", default=True),
-        st.Page(corpora_page.render, title="Corpus", icon="📚", url_path="corpus"),
-        st.Page(evaluate.render, title="Evaluate", icon="📊", url_path="evaluate"),
-        st.Page(runs.render, title="Past Evaluation Runs", icon="🏆", url_path="runs"),
-        st.Page(golden.render, title="Golden set", icon="✏️", url_path="golden"),
-    ])
+    pages = st.navigation(
+        {
+            "Setup": [
+                st.Page(
+                    corpora_page.render, title="Corpus", icon="📚", url_path="corpus", default=True
+                ),
+                st.Page(golden.render, title="Test questions", icon="✏️", url_path="test-questions"),
+            ],
+            "Experiment": [
+                st.Page(playground.render, title="Playground", icon="💬", url_path="playground"),
+                st.Page(evaluate.render, title="Run evaluation", icon="📊", url_path="evaluate"),
+            ],
+            "Results": [
+                st.Page(runs.render, title="Evaluation reports", icon="🏆", url_path="reports"),
+            ],
+        }
+    )
     pages.run()
 
 
