@@ -16,6 +16,7 @@ dependencies = [
     "tiktoken>=0.7",
     "python-frontmatter>=1.1",
     "rank-bm25>=0.2.2",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,9 @@ studio = [
 ]
 deepeval = [
     "deepeval>=2.0",
+]
+gemini = [
+    "google-genai>=1.22.0",
 ]
 mcp = [
     "mcp>=1.2",

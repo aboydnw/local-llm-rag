@@ -41,8 +41,45 @@ uv run rag-lab ingest --repo developmentseed/titiler
 uv run rag-lab ask "how do I add a custom raster source?"
 ```
 
+### Optional Gemini generation
+
+Ollama remains the default, and indexing always uses local embeddings. To run answer
+generation, agent steps, reranking, or the optional evaluation judge through Gemini:
+
+```bash
+uv sync --extra gemini
+cp .env-local-example .env-local
+# Edit .env-local and set GEMINI_API_KEY.
+```
+
+Then select Gemini in Studio or update `rag.yml`:
+
+```yaml
+llm:
+  provider: gemini
+  model: gemini-2.5-flash-lite
+
+eval:
+  deepeval: true
+  judge_provider: gemini
+  deepeval_model: gemini-2.5-flash
+```
+
+Install both optional integrations when using Gemini as the DeepEval judge:
+
+```bash
+uv sync --extra gemini --extra deepeval
+```
+
+The real `.env-local` file is ignored by git. Environment variables already present in your
+shell take precedence over values in that file. Gemini requests include the assembled prompt
+and retrieved passages; documents, embeddings, and the vector database otherwise stay local.
+Existing configs that use `llm.type: ollama` continue to load, although new configs are saved
+with the provider-oriented `llm.provider` field.
+
+
 `ask` retrieves the most relevant chunks (hybrid keyword + vector search), hands them to the
-local model, and prints an answer followed by a numbered source list. Use `--show-chunks` to
+configured model, and prints an answer followed by a numbered source list. Use `--show-chunks` to
 see what was retrieved, and `rag-lab inspect chunks` to debug the index.
 
 Configuration lives in `rag.yml` — swap the chunker, embedder, retriever weights, or LLM there.
@@ -86,8 +123,8 @@ rag-lab eval --golden golden.yml                     # auto-diffs vs the pinned 
 ```
 
 The harness scores retrieval (recall@k, MRR) and answer quality (keyword coverage, plus an
-optional LLM-graded judge via DeepEval — `eval.deepeval: true` in `rag.yml`, judged through
-Ollama like everything else). No API keys required.
+optional LLM-graded judge via DeepEval — `eval.deepeval: true` in `rag.yml`). Generation and
+judging use Ollama by default and can independently opt into Gemini.
 
 Every eval writes into a persistent **run store** (`.rag-lab/runs/`), shared by the CLI,
 Studio, and the MCP server. Each run records its scores plus provenance: config hash,
@@ -122,7 +159,8 @@ uv sync --extra studio        # one-time: install the studio dependencies
 uv run rag-lab studio         # launches a browser at http://localhost:8501
 ```
 
-It runs fully local (Streamlit, no JS toolchain, no API keys) and has four surfaces:
+It runs locally (Streamlit, no JS toolchain) and needs no API keys unless you opt into a hosted
+provider. It has four surfaces:
 
 - **Sidebar config knobs** — chunker, embedder, LLM, retriever, and agent settings, each tagged
   🟢 *cheap* (re-run eval only) or 🟠 *needs re-index* (rebuild the index). Save back to `rag.yml`.

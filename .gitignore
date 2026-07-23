@@ -15,3 +15,5 @@ htmlcov/
 .deepeval/
 /rag.yml
 .feedback/
+.superpowers/
+.env-local

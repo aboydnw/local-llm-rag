@@ -149,16 +149,18 @@ def _render_agent_knobs(cfg: Config) -> None:
     st.button("Reset agent prompt", on_click=_reset_agent_prompt)
 
 
-def _render_models(cfg: Config, installed: list[str], ollama_error: str | None) -> None:
-    st.subheader("LLM")
+def _render_ollama_model(cfg: Config, installed: list[str], ollama_error: str | None) -> None:
+    """Render installed-model selection and pull controls for local Ollama."""
     if ollama_error is not None:
         st.info("Ollama not reachable — is it running?")
+    if cfg.llm.model.startswith("gemini-"):
+        cfg.llm.model = installed[0] if installed else "llama3.2:3b"
     llm_options = config_logic.llm_model_options(installed, cfg.llm.model)
     llm_choice = st.selectbox(
         "LLM model",
         llm_options,
         index=llm_options.index(cfg.llm.model),
-        help="Ollama model that writes the final answer. Cheap to change — no rebuild needed.",
+        help="Local Ollama model that writes the final answer.",
     )
     if llm_choice == config_logic.PULL_SENTINEL:
         name = st.text_input("Model name to pull", key="llm_pull_name", placeholder="llama3.2:3b")
@@ -167,6 +169,36 @@ def _render_models(cfg: Config, installed: list[str], ollama_error: str | None) 
             cfg.llm.model = name.strip()
     else:
         cfg.llm.model = llm_choice
+
+
+def _render_gemini_model(cfg: Config) -> None:
+    """Render the hosted Gemini model-name control."""
+    if not cfg.llm.model.startswith("gemini-"):
+        cfg.llm.model = "gemini-2.5-flash-lite"
+    cfg.llm.model = (
+        st.text_input(
+            "Gemini model",
+            value=cfg.llm.model,
+            help="Use gemini-2.5-flash-lite for low cost or gemini-2.5-flash for quality.",
+        ).strip()
+        or "gemini-2.5-flash-lite"
+    )
+
+
+def _render_models(cfg: Config, installed: list[str], ollama_error: str | None) -> None:
+    """Render provider selection and dispatch to provider-specific controls."""
+    st.subheader("LLM")
+    providers = ["ollama", "gemini"]
+    cfg.llm.provider = st.selectbox(
+        "Provider",
+        providers,
+        index=providers.index(cfg.llm.provider),
+        help="Ollama stays local; Gemini sends prompts and retrieved passages to Google.",
+    )
+    if cfg.llm.provider == "ollama":
+        _render_ollama_model(cfg, installed, ollama_error)
+    else:
+        _render_gemini_model(cfg)
 
 
 def _render_prompt(cfg: Config) -> None:
