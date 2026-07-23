@@ -12,13 +12,12 @@ from rag_lab.studio.workspace import Workspace
 
 
 def _sweep_section(ws, corpus, cfg, golden) -> None:
-    st.subheader("Base eval sweep")
+    st.subheader("Compare standard presets")
     swept = experiments.latest_sweep_records(ws, corpus.label)
     if swept:
         best = max(swept, key=lambda r: r.scores.get("recall_at_k", 0.0))
         st.caption(
-            f"Last swept {swept[0].created_at} — best: "
-            f"{best.provenance.get('preset', best.name)}"
+            f"Last swept {swept[0].created_at} — best: {best.provenance.get('preset', best.name)}"
         )
     st.caption(
         "Runs all 8 base presets on the existing index. Every question is answered "
@@ -35,7 +34,10 @@ def _sweep_section(ws, corpus, cfg, golden) -> None:
         try:
             with feedback.instrument("eval-sweep"):
                 experiments.run_base_sweep(
-                    ws, corpus, cfg, golden,
+                    ws,
+                    corpus,
+                    cfg,
+                    golden,
                     sweep_id=uuid.uuid4().hex[:8],
                     created_at=datetime.now(UTC).isoformat(timespec="seconds"),
                     on_progress=lambda i, name: progress.progress(
@@ -72,7 +74,8 @@ def _seed_from(ws, corpus, cfg):
 
 def render() -> None:
     """Render the Evaluate page: run the golden set and show aggregates + report."""
-    st.title("Evaluate")
+    st.title("Run evaluation")
+    st.caption("Measure the active configuration against your test questions.")
     config_panel.render_corpus_picker(st.session_state)
     cfg = config_panel.render(st.session_state, "evaluate", include_corpus=False)
     ws = Workspace.default()
@@ -88,7 +91,7 @@ def render() -> None:
 
     _sweep_section(ws, corpus, cfg, golden)
 
-    st.subheader("Custom run (fine-tune)")
+    st.subheader("Evaluate this configuration")
     cfg = _seed_from(ws, corpus, cfg)
     name = st.text_input("Run name (optional)", placeholder="more-vector-weight")
     repeat = int(
@@ -122,7 +125,7 @@ def render() -> None:
         st.caption("Retrieval + keyword metrics only. Enable for answer-quality scoring.")
 
     st.caption("Runs in this tab — leaving the page before it finishes cancels the run.")
-    if st.button("Run eval", type="primary"):
+    if st.button("Run evaluation", type="primary"):
         st.session_state["evaluate_config_acted"] = True
         if not golden.exists():
             st.error(f"Golden set not found: {golden}")
@@ -131,7 +134,10 @@ def render() -> None:
             try:
                 with feedback.instrument("eval", name=name or None):
                     record = experiments.run_eval(
-                        ws, corpus, cfg, golden,
+                        ws,
+                        corpus,
+                        cfg,
+                        golden,
                         run_id=uuid.uuid4().hex[:8],
                         created_at=datetime.now(UTC).isoformat(timespec="seconds"),
                         name=name or None,
@@ -152,7 +158,7 @@ def render() -> None:
             st.session_state.pop("last_run_id", None)
             st.warning("The last run is no longer available.")
             return
-        st.subheader("Aggregates")
+        st.subheader("Evaluation complete")
         st.table(
             {
                 k: [
@@ -163,7 +169,4 @@ def render() -> None:
                 for k, v in record.scores.items()
             }
         )
-        st.subheader("Report")
-        report = ws.run_dir(run_id) / "report.md"
-        if report.exists():
-            st.markdown(report.read_text())
+        st.info("Open Evaluation reports to compare this run and inspect question-level results.")
