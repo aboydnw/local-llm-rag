@@ -9,6 +9,7 @@ from rag_lab.types import GenerationStats
 
 
 def _load_local_env() -> None:
+    """Load the nearest project-local environment file without overriding the shell."""
     path = find_dotenv(filename=".env-local", usecwd=True)
     if path:
         load_dotenv(path, override=False)
@@ -16,6 +17,7 @@ def _load_local_env() -> None:
 
 @lru_cache(maxsize=1)
 def _client():
+    """Build and cache the authenticated Gemini SDK client."""
     _load_local_env()
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -30,14 +32,18 @@ def _client():
 
 
 class GeminiLLM:
+    """Provider adapter for streamed Gemini text and structured generation."""
+
     def __init__(self, model: str) -> None:
         self.model = model
         self._last_stats: GenerationStats | None = None
 
     def generate(self, prompt: str, schema: dict | None = None) -> str:
+        """Generate one complete response, optionally constrained by a JSON schema."""
         return "".join(self.stream(prompt, schema))
 
     def stream(self, prompt: str, schema: dict | None = None) -> Iterator[str]:
+        """Yield response text as Gemini streams it and retain final usage statistics."""
         self._last_stats = None
         try:
             from google.genai import types
@@ -55,13 +61,17 @@ class GeminiLLM:
 
         started = monotonic()
         usage = None
-        for chunk in _client().models.generate_content_stream(
-            model=self.model, contents=prompt, config=config
-        ):
-            if chunk.text:
-                yield chunk.text
-            if chunk.usage_metadata is not None:
-                usage = chunk.usage_metadata
+        try:
+            chunks = _client().models.generate_content_stream(
+                model=self.model, contents=prompt, config=config
+            )
+            for chunk in chunks:
+                if chunk.text:
+                    yield chunk.text
+                if chunk.usage_metadata is not None:
+                    usage = chunk.usage_metadata
+        except Exception as exc:
+            raise RuntimeError(f"Gemini generation failed for {self.model}: {exc}") from exc
 
         if usage is not None:
             self._last_stats = GenerationStats(
@@ -72,4 +82,5 @@ class GeminiLLM:
             )
 
     def last_stats(self) -> GenerationStats | None:
+        """Return usage and elapsed-time statistics for the most recent generation."""
         return self._last_stats

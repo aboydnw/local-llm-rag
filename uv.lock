@@ -2356,7 +2356,7 @@ feedback = [
 requires-dist = [
     { name = "altair", marker = "extra == 'studio'", specifier = ">=5" },
     { name = "deepeval", marker = "extra == 'deepeval'", specifier = ">=2.0" },
-    { name = "google-genai", marker = "extra == 'gemini'", specifier = ">=1.0" },
+    { name = "google-genai", marker = "extra == 'gemini'", specifier = ">=1.22.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.2" },
     { name = "ollama", specifier = ">=0.3" },

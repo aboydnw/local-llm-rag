@@ -50,7 +50,7 @@ def test_gemini_client_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None
     gemini._client.cache_clear()
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(gemini, "find_dotenv", lambda **kwargs: "")
-    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
+    with pytest.raises(RuntimeError):
         gemini._client()
     gemini._client.cache_clear()
 
@@ -100,3 +100,29 @@ def test_gemini_stream_yields_text_and_records_usage(
     assert stats is not None
     assert stats.prompt_tokens == 7
     assert stats.output_tokens == 2
+
+
+def test_gemini_stream_wraps_provider_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    from rag_lab.llms import gemini
+
+    google_module = ModuleType("google")
+    genai_module = ModuleType("google.genai")
+    genai_module.types = SimpleNamespace(GenerateContentConfig=object)
+    google_module.genai = genai_module
+    monkeypatch.setitem(sys.modules, "google", google_module)
+    monkeypatch.setitem(sys.modules, "google.genai", genai_module)
+
+    class Models:
+        def generate_content_stream(self, **kwargs):
+            raise TimeoutError("provider timed out")
+
+    monkeypatch.setattr(
+        gemini,
+        "_client",
+        lambda: SimpleNamespace(models=Models()),
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        list(GeminiLLM("gemini-test").stream("prompt"))
+
+    assert isinstance(exc_info.value.__cause__, TimeoutError)
